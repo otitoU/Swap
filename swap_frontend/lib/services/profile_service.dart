@@ -17,6 +17,7 @@ class ProfileService {
     String servicesNeeded = '',
     String bio = '',
     String city = '',
+    Duration? timeout,
   }) async {
     if (skillsToOffer.trim().isEmpty) {
       debugPrint(
@@ -56,7 +57,7 @@ class ProfileService {
     try {
       resp = await http
           .post(uri, headers: headers, body: body)
-          .timeout(const Duration(seconds: 12));
+          .timeout(timeout ?? const Duration(seconds: 8));
     } catch (e) {
       // If we’re not on web, or we already removed Authorization, rethrow.
       if (!kIsWeb || headers['Authorization'] == null) rethrow;
@@ -66,7 +67,7 @@ class ProfileService {
       debugPrint('[ProfileService] retry without Authorization due to: $e');
       resp = await http
           .post(uri, headers: h2, body: body)
-          .timeout(const Duration(seconds: 12));
+          .timeout(timeout ?? const Duration(seconds: 8));
     }
 
     debugPrint('[ProfileService] resp ${resp.statusCode} ${resp.body}');

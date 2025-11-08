@@ -1,6 +1,7 @@
 // lib/pages/profile_setup_flow.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'dart:async'; // for TimeoutException
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -271,19 +272,29 @@ class _ProfileSetupFlowState extends State<ProfileSetupFlow> {
       final offersText = _skillsListToText(_offer);
       final needsText = _skillsListToText(_need);
 
-      await ProfileService().upsertProfile(
-        uid: user.uid,
-        email: user.email ?? '',
-        displayName: _fullName.text.trim().isNotEmpty
-            ? _fullName.text.trim()
-            : (_username.text.trim().isNotEmpty
-                  ? _username.text.trim()
-                  : (user.email ?? '')),
-        skillsToOffer: offersText,
-        servicesNeeded: needsText,
-        bio: _bio.text.trim(),
-        city: _city.text.trim(),
-      );
+      // Best-effort: do not block UX if backend is slow/unavailable.
+      try {
+        await ProfileService().upsertProfile(
+          uid: user.uid,
+          email: user.email ?? '',
+          displayName: _fullName.text.trim().isNotEmpty
+              ? _fullName.text.trim()
+              : (_username.text.trim().isNotEmpty
+                    ? _username.text.trim()
+                    : (user.email ?? '')),
+          skillsToOffer: offersText,
+          servicesNeeded: needsText,
+          bio: _bio.text.trim(),
+          city: _city.text.trim(),
+          timeout: const Duration(seconds: 8),
+        );
+      } on TimeoutException catch (e) {
+        debugPrint('[Onboarding] Backend upsert timed out: $e');
+        // Continue without failing the flow; backend can sync later.
+      } catch (e) {
+        debugPrint('[Onboarding] Backend upsert failed (non-fatal): $e');
+        // Non-fatal: allow user to proceed; search may lag until backend is up.
+      }
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
