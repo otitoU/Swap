@@ -206,72 +206,72 @@ Create a new user profile or update existing one with skill embeddings.
 **Request Body:**
 ```json
 {
-  "uid": "user123",
-  "email": "developer@example.com",
-  "display_name": "Jane Developer",
-  "skills_to_offer": "Python, FastAPI, Machine Learning, React",
-  "services_needed": "Guitar lessons, Photography, Spanish tutoring",
-  "bio": "Full-stack developer passionate about music",
-  "city": "Lagos"
+  "uid": "sarah_j_2024",
+  "email": "sarah.johnson@gmail.com",
+  "display_name": "Sarah Johnson",
+  "skills_to_offer": "I can teach web development with React and JavaScript. I also help people build their first website from scratch.",
+  "services_needed": "Looking for someone who can teach me product photography and basic photo editing skills.",
+  "bio": "Software engineer who loves building things",
+  "city": "Little Rock"
 }
 ```
 
 **Response:** `200 OK`
 ```json
 {
-  "uid": "user123",
-  "email": "developer@example.com",
-  "display_name": "Jane Developer",
-  "skills_to_offer": "Python, FastAPI, Machine Learning, React",
-  "services_needed": "Guitar lessons, Photography, Spanish tutoring",
-  "bio": "Full-stack developer passionate about music",
-  "city": "Lagos",
+  "uid": "sarah_j_2024",
+  "email": "sarah.johnson@gmail.com",
+  "display_name": "Sarah Johnson",
+  "skills_to_offer": "I can teach web development with React and JavaScript. I also help people build their first website from scratch.",
+  "services_needed": "Looking for someone who can teach me product photography and basic photo editing skills.",
+  "bio": "Software engineer who loves building things",
+  "city": "Little Rock",
   "created_at": "2025-11-08T10:30:00.000Z",
   "updated_at": "2025-11-08T10:30:00.000Z"
 }
 ```
 
-**What happens internally:**
-1. Profile saved to Firebase Firestore
-2. Skills converted to 384-dimensional vectors using BERT
-3. Vectors stored in Qdrant for semantic search
+**Behind the scenes:**
+1. User profile gets stored in Firebase Firestore
+2. The skills text is processed by our BERT model into numerical vectors
+3. These vectors get indexed in Qdrant so others can find you through search
 
-**Example:**
+**Try it:**
 ```bash
 curl -X POST https://swap-backend.fly.dev/profiles/upsert \
   -H "Content-Type: application/json" \
   -d '{
-    "uid": "user123",
-    "email": "dev@example.com",
-    "display_name": "Jane Dev",
-    "skills_to_offer": "Python programming",
-    "services_needed": "Guitar lessons"
+    "uid": "marcus_williams",
+    "email": "marcus.w@email.com",
+    "display_name": "Marcus Williams",
+    "skills_to_offer": "I can help you learn how to play bass guitar and understand music theory basics",
+    "services_needed": "Want to learn mobile app development, especially Flutter"
   }'
 ```
 
 ##### Get Profile
 **Endpoint:** `GET /profiles/{uid}`
 
-Retrieve a user profile by ID.
+Retrieve someone's profile.
 
 **Response:** `200 OK`
 ```json
 {
-  "uid": "user123",
-  "email": "developer@example.com",
-  "display_name": "Jane Developer",
-  "skills_to_offer": "Python, FastAPI, Machine Learning",
-  "services_needed": "Guitar lessons",
-  "bio": "Full-stack developer",
-  "city": "Lagos",
-  "created_at": "2025-11-08T10:30:00.000Z",
-  "updated_at": "2025-11-08T10:30:00.000Z"
+  "uid": "tyler_designs",
+  "email": "tyler.mitchell@yahoo.com",
+  "display_name": "Tyler Mitchell",
+  "skills_to_offer": "I can teach graphic design using Figma and Adobe Illustrator. I also do logo design and brand identity work.",
+  "services_needed": "Need help learning Spanish for an upcoming trip to Barcelona",
+  "bio": "Creative designer in Fayetteville",
+  "city": "Fayetteville",
+  "created_at": "2025-11-07T14:22:00.000Z",
+  "updated_at": "2025-11-08T09:15:00.000Z"
 }
 ```
 
-**Example:**
+**Try it:**
 ```bash
-curl https://swap-backend.fly.dev/profiles/user123
+curl https://swap-backend.fly.dev/profiles/tyler_designs
 ```
 
 ---
@@ -280,19 +280,19 @@ curl https://swap-backend.fly.dev/profiles/user123
 
 **Endpoint:** `POST /search`
 
-Find users by natural language query using AI-powered semantic matching.
+Search for people using everyday language. The AI understands what you mean, not just keyword matching.
 
 **Search Modes:**
-- **`offers`** (default): Find people who **can teach** what you want to learn
-- **`needs`**: Find people who **want to learn** what you can teach
-- **`both`**: Search all skills (offers + needs)
+- **`offers`**: Find people who can teach you something
+- **`needs`**: Find people who want to learn what you know
+- **`both`**: Search everything
 
-**Request Body:**
+**Request:**
 ```json
 {
-  "query": "teach me guitar and music production",
+  "query": "someone who can help me understand how to make beats and produce music",
   "mode": "offers",
-  "limit": 10
+  "limit": 5
 }
 ```
 
@@ -300,62 +300,61 @@ Find users by natural language query using AI-powered semantic matching.
 ```json
 [
   {
-    "uid": "musician_001",
-    "display_name": "Mike Guitar",
-    "email": "mike@example.com",
-    "skills_to_offer": "Guitar, Music production, Audio engineering",
-    "services_needed": "Web development, UI design",
-    "bio": "Professional guitarist with 10 years experience",
-    "city": "Lagos",
-    "score": 0.89
+    "uid": "dj_carlos",
+    "display_name": "Carlos Rodriguez",
+    "email": "carlosr.beats@gmail.com",
+    "skills_to_offer": "I teach music production using FL Studio and Ableton. I can show you how to make trap, hip-hop, and R&B instrumentals.",
+    "services_needed": "Want to get better at video editing, especially transitions and color grading",
+    "bio": "Producer and DJ, been making beats for 8 years",
+    "city": "Conway",
+    "score": 0.87
   },
   {
-    "uid": "producer_002",
-    "display_name": "Sarah Beats",
-    "email": "sarah@example.com",
-    "skills_to_offer": "Music production, Piano, Sound design",
-    "services_needed": "Python programming",
-    "bio": "Music producer and audio engineer",
-    "city": "Abuja",
-    "score": 0.84
+    "uid": "melody_davis",
+    "display_name": "Melody Davis",
+    "email": "melody.davis@outlook.com",
+    "skills_to_offer": "Can teach you music theory, sound design, and how to mix your own tracks professionally",
+    "services_needed": "Looking for someone to teach me content writing and copywriting",
+    "city": "Jonesboro",
+    "score": 0.82
   }
 ]
 ```
 
-**Score:** Float between 0.0 and 1.0 (higher = better semantic match)
+The **score** shows how well someone matches your search (0 to 1, higher is better).
 
-**Examples:**
+**More examples:**
 
-Find guitar teachers:
+Looking for a language tutor:
 ```bash
 curl -X POST https://swap-backend.fly.dev/search \
   -H "Content-Type: application/json" \
   -d '{
-    "query": "learn guitar and music theory",
+    "query": "someone who speaks French fluently and can teach me conversational French",
     "mode": "offers",
     "limit": 5
   }'
 ```
 
-Find people who want to learn Python:
+Want to teach your coding skills:
 ```bash
 curl -X POST https://swap-backend.fly.dev/search \
   -H "Content-Type: application/json" \
   -d '{
-    "query": "Python programming and web development",
+    "query": "I know JavaScript and React, looking for people who want to learn web development",
     "mode": "needs",
     "limit": 5
   }'
 ```
 
-Search everything:
+General search:
 ```bash
 curl -X POST https://swap-backend.fly.dev/search \
   -H "Content-Type: application/json" \
   -d '{
-    "query": "photography",
+    "query": "cooking and baking skills",
     "mode": "both",
-    "limit": 10
+    "limit": 8
   }'
 ```
 
@@ -374,15 +373,15 @@ Find mutual skill exchange partners where **you teach them** and **they teach yo
 4. Rank by combined score
 
 **Why Harmonic Mean?**
-- Penalizes lopsided matches
-- Both scores must be high for good match
-- Example: `(0.9, 0.9) → 0.90` ✅ vs `(0.9, 0.3) → 0.45` ❌
+It ensures both people benefit equally. A one-sided match gets penalized.
+- Good match: `(0.9, 0.9) → 0.90` ✅ 
+- One-sided: `(0.9, 0.3) → 0.45` ❌
 
-**Request Body:**
+**Request:**
 ```json
 {
-  "my_offer_text": "Python programming, FastAPI, Machine Learning",
-  "my_need_text": "Guitar lessons, Music theory, Songwriting",
+  "my_offer_text": "I can teach web development, specifically building sites with React and handling databases",
+  "my_need_text": "Want to learn acoustic guitar, maybe some basic music theory too",
   "limit": 10
 }
 ```
@@ -391,35 +390,35 @@ Find mutual skill exchange partners where **you teach them** and **they teach yo
 ```json
 [
   {
-    "uid": "guitarist_dev",
-    "display_name": "John Music",
-    "email": "john@example.com",
-    "skills_to_offer": "Guitar, Music theory, Songwriting",
-    "services_needed": "Python, API development, Machine Learning",
-    "bio": "Guitarist who wants to learn coding",
-    "city": "Lagos",
+    "uid": "brandon_strings",
+    "display_name": "Brandon Hayes",
+    "email": "brandonh.music@gmail.com",
+    "skills_to_offer": "I teach acoustic guitar, electric guitar, and music theory for beginners and intermediate players",
+    "services_needed": "Really want to learn web development so I can build my own website for my music lessons",
+    "bio": "Guitarist in Hot Springs, been playing for 12 years",
+    "city": "Hot Springs",
     "score": 0.91
   },
   {
-    "uid": "musician_coder",
-    "display_name": "Lisa Tech",
-    "email": "lisa@example.com",
-    "skills_to_offer": "Piano, Music production",
-    "services_needed": "Python, Web development",
-    "bio": "Music teacher learning to code",
-    "city": "Abuja",
+    "uid": "jasmine_codes",
+    "display_name": "Jasmine Parker",
+    "email": "jasmine.p@outlook.com",
+    "skills_to_offer": "Can teach you piano basics and how to read sheet music",
+    "services_needed": "Need help understanding how to code and build web applications",
+    "bio": "Piano teacher trying to transition to tech",
+    "city": "Bentonville",
     "score": 0.78
   }
 ]
 ```
 
-**Example:**
+**Try it:**
 ```bash
 curl -X POST https://swap-backend.fly.dev/match/reciprocal \
   -H "Content-Type: application/json" \
   -d '{
-    "my_offer_text": "Python programming and web development",
-    "my_need_text": "Guitar lessons and music production",
+    "my_offer_text": "I can help with graphic design and teach you Adobe Photoshop and Illustrator",
+    "my_need_text": "Looking to learn how to bake bread and pastries from scratch",
     "limit": 10
   }'
 ```
