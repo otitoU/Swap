@@ -316,7 +316,7 @@ curl https://swap-backend.fly.dev/profiles/tyler_designs
 
 **Endpoint:** `POST /search`
 
-Search using natural language. Works by meaning, not just keywords.
+Search using natural language. Works by meaning, not just keywords
 
 **Search Modes:**
 - **`offers`**: Find people who can teach you something
