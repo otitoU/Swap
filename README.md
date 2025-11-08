@@ -8,7 +8,7 @@
 <img width="1507" height="863" alt="Screenshot 2025-11-08 at 1 06 40 AM" src="https://github.com/user-attachments/assets/ddd18e3c-41d1-4bbe-b69e-5660e0367ccb" />
 <img width="1507" height="863" alt="Screenshot 2025-11-08 at 1 06 47 AM" src="https://github.com/user-attachments/assets/fe64da47-431d-4636-94c0-6d2795b4b39f" />
 
-## Challenge Statement(s) Addressed 🎯
+## Challenge Statement
 
 In Arkansas, thousands of people have talent, but limited access to opportunity. Small businesses make up **99.3% of all enterprises (≈ 258,000)**, yet the state still ranks **40th out of 51** in overall economic activity.
 
@@ -37,7 +37,7 @@ A college student in Little Rock who codes websites can trade with a hairstylist
 She builds the website; he braids her hair.  
 No cash — just community, fair value, and mutual growth.
 
-## 🌍 Why It Matters to Little Rock and Arkansas  
+## Why It Matters to Little Rock and Arkansas  
 
 - **Small Business Owners** often skip marketing or tech services because every dollar counts.  
 - **College Students** need real-world experience but can’t afford mentorship or tools.  
@@ -58,7 +58,7 @@ For **small businesses**, it means affordable growth.
 For **freelancers**, it means stronger portfolios and networks.  
 For **college students**, it means real-world experience without debt. 
 
-## 💻 Tech Overview & Tech Stack
+## Tech Stack
 
 Website / Frontend: Flutter (web) — responsive UI, single codebase targeting web/desktop/mobile.
 
@@ -70,35 +70,38 @@ Website / Frontend: Flutter (web) — responsive UI, single codebase targeting w
 
 #### Backend
 
-**FastAPI + Machine Learning Powered Matching Engine**
+Built with FastAPI and machine learning for smart skill matching.
 
-- **Python 3.11** with **FastAPI** - Modern async REST API
-- **Firebase Firestore** - NoSQL database for profile storage
+- **Python 3.11** + **FastAPI** - REST API
+- **Firebase Firestore** - User profile storage
 - **Qdrant Cloud** - Vector database for semantic search
-- **sentence-transformers (BERT)** - ML model for natural language understanding
-- **Docker** - Containerized deployment
-- **Fly.io** - Production hosting with global edge deployment
+- **Redis** - Caching layer (16x faster repeat queries)
+- **sentence-transformers (BERT)** - Text embedding model
+- **Docker** - Containerization
+- **Fly.io** - Production hosting
 
 ![Python](https://img.shields.io/badge/python-3.11-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54) ![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi) ![Firebase](https://img.shields.io/badge/firebase-%23039BE5.svg?style=for-the-badge&logo=firebase) ![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=for-the-badge&logo=docker&logoColor=white)
 
-**Key Backend Features:**
-- 🤖 **Semantic Search** - Find skills using natural language (e.g., "teach me guitar" matches "music lessons")
-- 🔄 **Reciprocal Matching** - Smart algorithm finds mutual skill exchange partners
-- ⚡ **Sub-100ms Search** - Lightning-fast vector similarity search
-- 📊 **384-dimensional BERT Embeddings** - Each skill converted to semantic vectors
-- 🎯 **Harmonic Mean Scoring** - Ensures balanced mutual matches
+**Backend Features:**
+- Semantic search using BERT (finds skills by meaning, not just keywords)
+- Reciprocal matching algorithm (finds mutual exchanges)
+- Fast vector similarity search (~80ms, ~5ms with cache)
+- Redis caching layer (16x speedup on repeat queries)
+- 384-dimensional embeddings for each skill
+- Harmonic mean scoring for balanced matches
 
 **Production API:** `https://swap-backend.fly.dev`
 
-**[📚 Full Backend Documentation](wap-backend/README.md)**
+**[Full Backend Documentation](wap-backend/README.md)**
 
 #### Authentication & Database
 
 - **Firebase Authentication** - Secure user management
 - **Firebase Firestore** - Profile data storage with automatic indexing
 - **Qdrant Cloud** - Vector storage for 10,000+ profiles (free tier)
+- **Redis** - Cache layer (local dev only, not on production yet)
 
-## 🏗️ Architecture & Infrastructure
+## Architecture
 
 ```
                     ┌──────────────────────────────────────┐
@@ -122,22 +125,30 @@ Website / Frontend: Flutter (web) — responsive UI, single codebase targeting w
                     │  │  ML Embeddings Service         │  │
                     │  │  (BERT sentence-transformers)  │  │
                     │  └────────────────────────────────┘  │
-                    └──────┬─────────────────┬─────────────┘
-                           │                 │
-                           │                 │
-            ┌──────────────▼───────┐    ┌────▼──────────────────┐
-            │  Firebase Firestore  │    │   Qdrant Cloud        │
-            │  (Profile Storage)   │    │   (Vector Database)   │
-            │                      │    │                       │
-            │  • User profiles     │    │  • 384-dim vectors    │
-            │  • Skills data       │    │  • HNSW indexing      │
-            │  • Metadata          │    │  • Cosine similarity  │
-            └──────────────────────┘    └───────────────────────┘
+                    └──────┬──────────┬──────────┬─────────────┘
+                           │          │          │
+                           │          │          │
+            ┌──────────────▼───────┐  │   ┌──────▼──────────────────┐
+            │  Firebase Firestore  │  │   │   Qdrant Cloud          │
+            │  (Profile Storage)   │  │   │   (Vector Database)     │
+            │                      │  │   │                         │
+            │  • User profiles     │  │   │  • 384-dim vectors      │
+            │  • Skills data       │  │   │  • HNSW indexing        │
+            │  • Metadata          │  │   │  • Cosine similarity    │
+            └──────────────────────┘  │   └─────────────────────────┘
+                                      │
+                               ┌──────▼──────┐
+                               │    Redis    │
+                               │  (Cache)    │
+                               │             │
+                               │  • 5ms hits │
+                               │  • 1hr TTL  │
+                               └─────────────┘
 ```
 
-### 🔄 Data Flow
+### Data Flow
 
-**1. Profile Creation Flow**
+**Profile Creation:**
 ```
 User Input → FastAPI Validation → Firebase (store profile)
                                  ↓
@@ -146,7 +157,7 @@ User Input → FastAPI Validation → Firebase (store profile)
                           Qdrant (store vectors)
 ```
 
-**2. Semantic Search Flow**
+**Semantic Search:**
 ```
 Query "guitar lessons" → ML Model (text → 384-dim vector)
                               ↓
@@ -157,7 +168,7 @@ Query "guitar lessons" → ML Model (text → 384-dim vector)
                        Ranked Results (by cosine similarity)
 ```
 
-**3. Reciprocal Matching Flow**
+**Reciprocal Matching:**
 ```
 My Skills: "Python"  }
 My Needs: "Guitar"   } → ML Model → 2 vectors
@@ -174,19 +185,21 @@ My Needs: "Guitar"   } → ML Model → 2 vectors
                     Top Mutual Matches
 ```
 
-### ⚡ Performance Metrics
+### Performance
 
-| Operation | Latency | Components Used |
-|-----------|---------|-----------------|
-| Profile Create | ~150ms | FastAPI → Firebase → ML → Qdrant |
-| Profile Read | ~20ms | FastAPI → Firebase |
-| Semantic Search | ~80ms | FastAPI → ML → Qdrant → Firebase |
-| Reciprocal Match | ~120ms | FastAPI → ML → Qdrant (2x) → Firebase |
-| Health Check | ~1ms | FastAPI only |
+| Operation | Cached | Uncached | Components Used |
+|-----------|--------|----------|-----------------|
+| Semantic Search | ~5ms | ~80ms | FastAPI → ML → Qdrant → Firebase |
+| Reciprocal Match | ~8ms | ~120ms | FastAPI → ML → Qdrant (2x) → Firebase |
+| Profile Create | - | ~150ms | FastAPI → Firebase → ML → Qdrant |
+| Profile Read | - | ~20ms | FastAPI → Firebase |
+| Health Check | - | ~1ms | FastAPI only |
 
 *Tested on: Fly.io (1GB RAM, 1 CPU), 1000+ profiles*
 
-## 📡 API Documentation
+**Note:** Redis caching speeds up repeat queries by ~16x. Currently only running in local dev (docker-compose), not deployed to production yet.
+
+## API Documentation
 
 ### Backend REST APIs
 
@@ -253,10 +266,10 @@ Create a new user profile or update existing one with skill embeddings.
 }
 ```
 
-**Behind the scenes:**
-1. User profile gets stored in Firebase Firestore
-2. The skills text is processed by our BERT model into numerical vectors
-3. These vectors get indexed in Qdrant so others can find you through search
+What happens:
+1. Profile stored in Firebase Firestore
+2. Skills text converted to vectors using BERT
+3. Vectors indexed in Qdrant for search
 
 **Try it:**
 ```bash
@@ -302,7 +315,7 @@ curl https://swap-backend.fly.dev/profiles/tyler_designs
 
 **Endpoint:** `POST /search`
 
-Search for people using everyday language. The AI understands what you mean, not just keyword matching.
+Search using natural language. Works by meaning, not just keywords.
 
 **Search Modes:**
 - **`offers`**: Find people who can teach you something
@@ -343,7 +356,7 @@ Search for people using everyday language. The AI understands what you mean, not
 ]
 ```
 
-The **score** shows how well someone matches your search (0 to 1, higher is better).
+Score ranges from 0 to 1 (higher = better match).
 
 **More examples:**
 
@@ -395,9 +408,9 @@ Find mutual skill exchange partners where **you teach them** and **they teach yo
 4. Rank by combined score
 
 **Why Harmonic Mean?**
-It ensures both people benefit equally. A one-sided match gets penalized.
-- Good match: `(0.9, 0.9) → 0.90` ✅ 
-- One-sided: `(0.9, 0.3) → 0.45` ❌
+Penalizes one-sided matches. Both scores need to be high.
+- Good match: `(0.9, 0.9) → 0.90`
+- One-sided: `(0.9, 0.3) → 0.45`
 
 **Request:**
 ```json
@@ -485,7 +498,16 @@ curl -X POST https://swap-backend.fly.dev/match/reciprocal \
   - Normalized embeddings
   - Fast inference (~10-20ms per encoding)
 
-#### 4. Fly.io Platform
+#### 4. Redis
+- **Service:** In-memory data store for caching
+- **Deployment:** Local development only (via docker-compose)
+- **Features:**
+  - Sub-5ms response times
+  - 1 hour TTL on cached results
+  - Automatic cache invalidation on profile updates
+  - Graceful degradation if unavailable
+
+#### 5. Fly.io Platform
 - **Service:** Cloud application hosting
 - **Region:** US East (Virginia)
 - **Features:**
@@ -496,7 +518,7 @@ curl -X POST https://swap-backend.fly.dev/match/reciprocal \
 
 ---
 
-**[📖 Complete API Documentation with Postman Examples](wap-backend/docs/API.md)**
+**[Complete API Documentation with Postman Examples](wap-backend/docs/API.md)**
 
 ## User Stories
 
@@ -522,7 +544,7 @@ Basic flow (quick):
 ### Link to Demo Presentation
 - placeholder: https://your-presentation-link
 
-### Team Checklist ✅
+### Team Checklist
 - [x] Team photo
 - [x] Team Slack channel
 - [x] Communication established with mentor
@@ -540,7 +562,7 @@ Philander Smith University
 ### Team Name
 Panthers
 
-### ✨ Contributors ✨
+### Contributors
 * Immanuella Emem Umoren
 * Kenna Agbugba
 * Otito Udedibor
