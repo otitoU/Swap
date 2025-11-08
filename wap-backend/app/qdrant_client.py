@@ -1,6 +1,7 @@
 """Qdrant vector database client."""
 
 from typing import List, Dict, Any
+import uuid
 from qdrant_client import QdrantClient as QdrantClientBase
 from qdrant_client.models import (
     Distance,
@@ -12,6 +13,7 @@ from qdrant_client.models import (
     FieldCondition,
     MatchValue,
     Range,
+    Batch,
 )
 
 from app.config import settings
@@ -65,8 +67,11 @@ class QdrantService:
             need_vec: Embedding of wants_learn
             payload: Profile metadata
         """
+        # Ensure point id is a UUID (Qdrant supports integer or UUID ids)
+        point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, username))
+
         point = PointStruct(
-            id=username,
+            id=point_id,
             vector={
                 "offer_vec": offer_vec,
                 "need_vec": need_vec,

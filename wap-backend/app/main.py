@@ -8,12 +8,28 @@ from app.config import settings
 from app.firebase_db import get_firebase_service
 from app.routers import profiles, search, swaps
 
+# #########################################################################################
+
+# import firebase_admin
+# from firebase_admin import credentials
+
+# cred = credentials.Certificate("path/to/serviceAccountKey.json")
+# firebase_admin.initialize_app(cred)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifecycle management for the application."""
     # Startup - Initialize Firebase
     get_firebase_service()
+    
+    # Pre-load ML model to avoid slow first request
+    from app.embeddings import get_embedding_service
+    print("🔄 Loading ML model...")
+    embedding_service = get_embedding_service()
+    embedding_service.encode("warmup")  # Cache the model in memory
+    print("✅ ML model loaded and ready!")
+    
     yield
     # Shutdown
     pass

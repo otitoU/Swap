@@ -16,9 +16,9 @@ class Settings(BaseSettings):
     qdrant_port: int = 6333
     qdrant_collection: str = "swap_users"
     
-    # Embeddings
-    embedding_model: str = "sentence-transformers/bert-base-nli-mean-tokens"
-    vector_dim: int = 768
+    # Embeddings (using smaller, faster model)
+    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+    vector_dim: int = 384  # MiniLM uses 384 dimensions (vs 768 for BERT)
     
     # App
     app_name: str = "$wap"

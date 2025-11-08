@@ -129,18 +129,19 @@ Response:
 
 ---
 
-### Semantic Search
+### Semantic Search (Natural Language)
 
 **POST** `/search`
 
-Search profiles by what they offer using semantic similarity.
+Search profiles semantically by what they offer or need.
 
 **Request:**
 ```json
 {
-  "query": "guitar lessons music theory",
+  "query": "teach me guitar and music theory",
   "limit": 10,
-  "score_threshold": 0.3
+  "score_threshold": 0.3,
+  "mode": "offers"  // "offers" | "needs" | "both" (default: "offers")
 }
 ```
 
@@ -153,19 +154,27 @@ Search profiles by what they offer using semantic similarity.
     "display_name": "Bob",
     "skills_to_offer": "Guitar, music theory, jazz",
     "services_needed": "Python programming",
-    "score": 0.92,
-    ...
+    "score": 0.92
   }
 ]
 ```
 
+Examples:
 ```bash
+# Search people who can teach guitar (offer_vec)
 curl -X POST http://localhost:8000/search \
   -H "Content-Type: application/json" \
-  -d '{
-    "query": "teach me guitar and music",
-    "limit": 5
-  }'
+  -d '{"query":"teach me guitar and music","limit":5,"mode":"offers"}'
+
+# Search people who need Python help (need_vec)
+curl -X POST http://localhost:8000/search \
+  -H "Content-Type: application/json" \
+  -d '{"query":"i need python help","limit":5,"mode":"needs"}'
+
+# Search both, return best per user (max score of offers/needs)
+curl -X POST http://localhost:8000/search \
+  -H "Content-Type: application/json" \
+  -d '{"query":"guitar and python","limit":10,"mode":"both"}'
 ```
 
 ---
