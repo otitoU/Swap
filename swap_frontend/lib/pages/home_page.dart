@@ -6,7 +6,6 @@ import '../services/search_service.dart';
 // import 'post_skill_page.dart'; // no longer used directly here
 import '../services/auth_service.dart';
 import '../widgets/app_sidebar.dart';
-import '../services/health_service.dart';
 // Removed debug-only imports (seed/upsert/test helpers)
 
 class HomePage extends StatefulWidget {
@@ -106,32 +105,6 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  final _health = HealthService();
-
-  @override
-  void initState() {
-    super.initState();
-    _checkHealthOnce();
-  }
-
-  Future<void> _checkHealthOnce() async {
-    try {
-      final res = await _health.ping();
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Backend: $res')));
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Health check failed: $e')));
-    }
-  }
-
-  // Removed unused helper _skillsListToText
-
-  // Removed debug-only helper methods (_seedTestProfiles, _upsertMeNow, _testSearchNow)
 
   @override
   Widget build(BuildContext context) {
