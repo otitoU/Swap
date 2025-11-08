@@ -682,7 +682,9 @@ curl -X POST https://swap-backend.fly.dev/match/reciprocal \
 ### Demo/Test Credentials
 
 For testing without creating a new account:
-Email: creator@swap.test
+
+Email: amy@gmail.com
+
 Password: Test123!
 
 ### Link to Demo Presentation
