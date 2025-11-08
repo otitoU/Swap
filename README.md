@@ -38,7 +38,6 @@ She builds the website; he braids her hair.
 No cash — just community, fair value, and mutual growth.
 
 ## Why It Matters to Little Rock and Arkansas  
-## Why It Matters to Little Rock and Arkansas  
 
 - **Small Business Owners** often skip marketing or tech services because every dollar counts.  
 - **College Students** need real-world experience but can’t afford mentorship or tools.  
