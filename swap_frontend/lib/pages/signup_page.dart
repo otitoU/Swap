@@ -1,4 +1,5 @@
 // lib/pages/signup_page.dart
+import 'package:besmart_2025/pages/landing_page.dart';
 import 'package:flutter/material.dart';
 import 'package:model_viewer_plus/model_viewer_plus.dart';
 import '../services/auth_service.dart';
@@ -169,11 +170,30 @@ class _SignUpPageState extends State<SignUpPage> {
     return Scaffold(
       backgroundColor: const Color(0xFF0D0D0D),
       body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: maxContentWidth),
-            child: content,
-          ),
+        child: Stack(
+          children: [
+            // Top-left logo → go Home
+            Positioned(
+              top: 16,
+              left: 16,
+              child: _LogoHomeButton(
+                size: 72, // tweak size if you want
+                onTap: () {
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(builder: (_) => const LandingPage()),
+                  );
+                },
+              ),
+            ),
+
+            // Your existing centered content
+            Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: maxContentWidth),
+                child: content,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -245,7 +265,7 @@ class _SignUpPageState extends State<SignUpPage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Text(
-              "Create an Account",
+              r"Welcome to $wap",
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 26,
@@ -479,9 +499,6 @@ class _SignUpPageState extends State<SignUpPage> {
   }
 }
 
-/// -------------------- 3D PANEL --------------------
-/// Duplicated here so this file is self-contained.
-/// Uses the same 3D hamburger .glb asset as your login page.
 class _Rainbow3DPanel extends StatelessWidget {
   const _Rainbow3DPanel({this.maxSide});
   final double? maxSide;
@@ -525,8 +542,7 @@ class _Rainbow3D extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const ModelViewer(
-      src:
-          'assets/Hamburger.glb', // ensure this asset exists & is in pubspec.yaml
+      src: 'assets/icon.glb',
       alt: '3D rainbow blob',
       autoRotate: true,
       autoRotateDelay: 0,
@@ -536,6 +552,27 @@ class _Rainbow3D extends StatelessWidget {
       exposure: 1.1,
       shadowIntensity: 0.1,
       shadowSoftness: 0.1,
+    );
+  }
+}
+
+class _LogoHomeButton extends StatelessWidget {
+  final VoidCallback onTap;
+  final double size;
+  const _LogoHomeButton({required this.onTap, this.size = 80});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: SizedBox(
+        height: size,
+        width: size,
+        child: Image.asset(
+          'assets/Swap-removebg-preview.png',
+          fit: BoxFit.contain,
+        ),
+      ),
     );
   }
 }
