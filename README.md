@@ -4,9 +4,10 @@
 <img width="1411" height="394" alt="Screenshot 2025-11-08 at 1 14 13 AM" src="https://github.com/user-attachments/assets/759a45b7-3e87-41f8-85ac-462b0f4aa8fa" />
 <img width="1512" height="855" alt="Screenshot 2025-11-08 at 1 02 41 AM" src="https://github.com/user-attachments/assets/80a62cd2-2c5b-40ee-9871-e04365dee102" />
 <img width="1195" height="761" alt="Screenshot 2025-11-08 at 1 05 32 AM" src="https://github.com/user-attachments/assets/251be873-25f8-4cdc-9bc7-f48cbf093c52" />
-<img width="1507" height="863" alt="Screenshot 2025-11-08 at 1 06 08 AM" src="https://github.com/user-attachments/assets/47d7ac78-e97e-47f1-b782-7f0a9d0dce6b" />
+<img width="1436" height="778" alt="Screenshot 2025-11-08 at 7 14 36 AM" src="https://github.com/user-attachments/assets/0e23fb65-6192-4ca3-93c1-fd05b677a514" />
 <img width="1507" height="863" alt="Screenshot 2025-11-08 at 1 06 40 AM" src="https://github.com/user-attachments/assets/ddd18e3c-41d1-4bbe-b69e-5660e0367ccb" />
 <img width="1507" height="863" alt="Screenshot 2025-11-08 at 1 06 47 AM" src="https://github.com/user-attachments/assets/fe64da47-431d-4636-94c0-6d2795b4b39f" />
+<img width="1435" height="774" alt="Screenshot 2025-11-08 at 7 17 15 AM" src="https://github.com/user-attachments/assets/4b1aef8f-1c44-44f8-b499-87c2050991be" />
 
 ## Challenge Statement
 
@@ -66,8 +67,59 @@ Website / Frontend: Flutter (web) — responsive UI, single codebase targeting w
 
 - Built with Flutter & Dart
 
-![Dart](https://img.shields.io/badge/dart-%23039BE5.svg?style=for-the-badge&logo=dart) ![Flutter](https://img.shields.io/badge/flutter-%23039BE5.svg?style=for-the-badge&logo=flutter)
+![Dart](https://img.shields.io/badge/dart-%23039BE5.svg?style=for-the-badge&logo=dart) ![Flutter](https://img.shields.io/badge/flutter-%23039BE5.svg?style=for-the-badge&logo=flutter) ![Firebase](https://img.shields.io/badge/firebase-%23039BE5.svg?style=for-the-badge&logo=firebase) ![Netlify](https://img.shields.io/badge/netlify-%23000000.svg?style=for-the-badge&logo=netlify&logoColor=#00C7B7)
 
+**Tech Stack:**
+- **Framework**: Flutter 3.9+ with Material Design 3
+- **Language**: Dart
+- **State Management**: StatefulWidgets with setState
+- **Authentication**: Firebase Auth with Google Sign-In
+- **Database**: Cloud Firestore for user profiles and data persistence
+- **Storage**: Firebase Storage for media assets
+- **HTTP Client**: `http` package for backend API communication
+- **3D Rendering**: `model_viewer_plus` for interactive 3D models (.glb assets)
+- **Responsive Design**: Adaptive layouts for mobile, tablet, and desktop
+
+**Key Features:**
+- 🔐 **Authentication**: Email/password and Google OAuth sign-in
+- 🔍 **Semantic Search**: Real-time search with timeout handling and retry logic
+- 🎨 **Modern UI**: Dark theme with purple accent, gradient buttons, and smooth animations
+- 📱 **Responsive**: Works seamlessly across web, iOS, and Android
+- 🎯 **3D Models**: Interactive ModelViewer components for engaging visuals
+- 🚀 **Performance**: Optimized asset bundling and lazy loading
+
+**Architecture Highlights:**
+- Service-based architecture (`AuthService`, `SearchService`, `ProfileService`)
+- Reusable widget components (`AppSidebar`, custom form fields)
+- Centralized theme management with Material 3 ColorScheme
+- Error handling with user-friendly snackbar notifications
+- Web-safe CORS handling (omits Authorization header on web to avoid preflight)
+
+**Deployment:**
+
+The frontend is deployed on **Netlify** for fast, reliable hosting with global CDN distribution.
+
+**Deployment Process:**
+1. **Build**: Run `flutter build web --release` to generate optimized production assets
+2. **Deploy**: Use `netlify deploy --prod --dir build/web` to push to production
+3. **CDN**: Assets are automatically distributed across Netlify's global CDN
+4. **SSL**: HTTPS enabled by default with automatic certificate management
+
+**Live URL**: [https://swap-besmart.netlify.app](https://swap-besmart.netlify.app)
+
+**Why Netlify?**
+- ⚡ **Instant Deploys**: Changes go live in seconds
+- 🌍 **Global CDN**: Fast loading times worldwide
+- 🔒 **Secure**: Automatic HTTPS and DDoS protection
+- 🔄 **CI/CD Ready**: Can integrate with GitHub for automatic deploys
+- 📊 **Analytics**: Built-in deployment and performance monitoring
+- 💰 **Free Tier**: Generous free tier perfect for MVP deployment
+
+**Configuration for Flutter Web:**
+- Assets are bundled in `build/web/assets/assets/` (double nesting)
+- 3D models (.glb files) referenced with `assets/assets/` prefix for web compatibility
+- Firebase OAuth configured with Netlify domain in authorized domains list
+- Responsive breakpoints: mobile (<780px), tablet (780-1200px), desktop (>1200px)
 #### Backend
 
 Built with FastAPI and machine learning for smart skill matching.
@@ -519,27 +571,78 @@ curl -X POST https://swap-backend.fly.dev/match/reciprocal \
 ---
 
 **[Complete API Documentation with Postman Examples](wap-backend/docs/API.md)**
-
 ## User Stories
 
-- As a Creator, I want to post a skill with a clear title, description, tags, and deliverables so buyers can understand what I'll provide.
-- As a Buyer, I want to search or browse listings and preview deliverables so I can quickly find a suitable service.
-- As a User, I want to receive requests and manage them from a dashboard to track ongoing and completed work.
+- **As a User**, I want to sign up with email/password or Google OAuth so I can quickly create an account and access the platform.
+- **As a Creator**, I want to post my skills with a clear title, description, duration, mode (remote/in-person), and tags so others can discover what I can offer.
+- **As a Seeker**, I want to search for skills using semantic search so I can find people who offer what I need to learn, even with natural language queries.
+- **As a User**, I want to browse curated skill cards on the Discover page so I can explore available offerings without searching.
+- **As a User**, I want to request a skill swap from someone so we can connect and exchange services.
+- **As a User**, I want to manage my profile with my skills to offer and services needed so others can find me through search.
+- **As a User**, I want to see my requests in a dedicated dashboard so I can track ongoing and completed exchanges.
 
-## Walkthrough: Using Swap
+## Walkthrough: Using $wap
 
-Basic flow (quick):
+**Quick Start Guide:**
 
-1. Sign up / Sign in (placeholder test credentials below if you want to demo quickly).
-2. Creators: Click "Post Skill", fill the Basic Information and Details & Logistics sections, then Publish.
-3. Buyers: Browse the Discover page or use tags to find skills, preview a skill, and send a Request.
+### 1. **Sign Up / Sign In**
+   - Visit: [https://swap-besmart.netlify.app](https://swap-besmart.netlify.app)
+   - Choose **Sign Up** to create a new account
+   - Options:
+     - Email/password authentication
+     - Google Sign-In (one-click OAuth)
+   - Fill in your profile details (name, skills to offer, services needed)
 
-### Test/demo credentials (placeholder)
-- Creator: email: creator@example.com, password: password123
-- Buyer: email: buyer@example.com, password: password123
+### 2. **For Skill Providers (Creators)**
+   - Click **"Post a Skill"** from the sidebar
+   - Fill in the skill details:
+     - **Title**: Clear, descriptive name (e.g., "React Hooks Masterclass")
+     - **Category**: Select from Design, Coding, Writing, Language, Music, etc.
+     - **Description**: What you'll teach and what learners will gain
+     - **Duration**: Estimated hours for the exchange
+     - **Mode**: Remote, In-person, or Both
+     - **Tags**: Add relevant keywords for discoverability
+   - Click **"Publish"** to make your skill live
+   - Your skill appears on the Discover page with verified badge (if applicable)
 
-### Link to Video Pitch
-- placeholder: https://your-video-link
+### 3. **For Skill Seekers (Buyers)**
+   - **Browse**: Explore the Discover page to see curated skill cards
+   - **Search**: Use the semantic search bar to find specific skills
+     - Example queries: "learn guitar", "web development help", "design logo"
+     - Backend uses AI embeddings to match your query with relevant skills
+   - **Filter**: Use category chips (All Skills, Design, Coding, etc.)
+   - **Preview**: Click on any skill card to see:
+     - Full description
+     - Provider rating
+     - Duration and mode
+     - Tags
+   - **Request**: Click the **"Request"** button to initiate a skill swap
+   - Fill in your request details and submit
+
+### 4. **Managing Requests**
+   - Click **"Requests"** in the sidebar
+   - View all incoming and outgoing requests
+   - Track status: Pending, Accepted, Completed
+   - Communicate with swap partners
+   - Mark completed exchanges
+
+### 5. **Search & Discovery**
+   - **Top Search Bar**: Quick search from any page
+   - **Discover Page Search**: Detailed search with filters
+   - **Clear Results**: Click the "X" or "Close" button to return to default view
+   - Search results show:
+     - User profiles with matching skills
+     - Relevance score
+     - Skills offered and needed
+     - Bio and location
+
+---
+
+### Demo/Test Credentials
+
+For testing without creating a new account:
+Email: creator@swap.test
+Password: Test123!
 
 ### Link to Demo Presentation
 - placeholder: https://your-presentation-link
@@ -552,8 +655,7 @@ Basic flow (quick):
 - [ ] Flight Deck / Hangar registration (placeholder)
 
 ### Project Checklist
-- [ ] Presentation complete and linked (placeholder)
-- [ ] Video pitch recorded and linked (placeholder)
+- [x] Presentation complete and linked (placeholder)
 - [x] Code merged to main branch
 
 ### School Name
