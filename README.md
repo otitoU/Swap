@@ -248,7 +248,7 @@ My Needs: "Guitar"   } → ML Model → 2 vectors
 | Profile Read | - | ~20ms | FastAPI → Firebase |
 | Health Check | - | ~1ms | FastAPI only |
 
-*Tested on: Fly.io (1GB RAM, 1 CPU), 1000+ profiles*
+*Tested on: Fly.io (1GB RAM, 1 CPU), 50+ profiles*
 
 **Note:** Redis caching speeds up repeat queries by ~16x. Currently only running in local dev (docker-compose), not deployed to production yet.
 
