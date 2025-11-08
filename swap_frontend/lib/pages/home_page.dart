@@ -1,6 +1,7 @@
 // lib/pages/home_page.dart
 import 'package:flutter/material.dart';
 import 'landing_page.dart';
+import 'post_skill_page.dart';
 import '../services/auth_service.dart';
 
 class HomePage extends StatelessWidget {
@@ -167,7 +168,9 @@ class _Sidebar extends StatelessWidget {
           const SizedBox(height: 8),
           _NavItem(icon: Icons.home_rounded, label: 'Home', active: true),
           _NavItem(icon: Icons.explore_outlined, label: 'Discover'),
-          _NavItem(icon: Icons.add_circle_outline, label: 'Post Skill'),
+          _NavItem(icon: Icons.add_circle_outline, label: 'Post Skill', onTap: () {
+            Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PostSkillPage()));
+          }),
           _NavItem(icon: Icons.inbox_outlined, label: 'Requests', badge: '2'),
           _NavItem(icon: Icons.analytics_outlined, label: 'Dashboard'),
           _NavItem(icon: Icons.person_outline, label: 'Profile'),
@@ -203,10 +206,12 @@ class _Sidebar extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   SizedBox(
-                    width: double.infinity,
-                    height: 44,
-                    child: FilledButton(
-                      onPressed: () {},
+                            width: double.infinity,
+                            height: 44,
+                            child: FilledButton(
+                              onPressed: () {
+                                Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PostSkillPage()));
+                              },
                       style: FilledButton.styleFrom(
                         backgroundColor: HomePage.accent,
                         foregroundColor: Colors.white,
@@ -233,7 +238,9 @@ class _NavItem extends StatelessWidget {
     required this.label,
     this.active = false,
     this.badge,
+    this.onTap,
   });
+  final VoidCallback? onTap;
 
   final IconData icon;
   final String label;
@@ -278,7 +285,7 @@ class _NavItem extends StatelessWidget {
                   ),
                 ),
               ),
-        onTap: () {},
+  onTap: onTap,
       ),
     );
   }
@@ -462,7 +469,8 @@ class _DiscoverPane extends StatelessWidget {
                     crossAxisCount: crossAxisCount,
                     mainAxisSpacing: 18,
                     crossAxisSpacing: 18,
-                    mainAxisExtent: 220,
+                    // increase card height slightly to avoid occasional overflow
+                    mainAxisExtent: 260,
                   ),
                   itemBuilder: (context, i) => _SkillCard(skill: skills[i]),
                 );
@@ -594,32 +602,39 @@ class _SkillCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
-            // tags + button
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
+            // tags + button: use a Row so the button can align to the right reliably.
+            Row(
               children: [
-                for (final t in skill.tags.take(3))
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: HomePage.surface,
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: HomePage.line),
-                    ),
-                    child: Text(
-                      t,
-                      style: const TextStyle(
-                        color: HomePage.textMuted,
-                        fontSize: 12,
-                      ),
+                Flexible(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        for (final t in skill.tags.take(3))
+                          Container(
+                            margin: const EdgeInsets.only(right: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: HomePage.surface,
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(color: HomePage.line),
+                            ),
+                            child: Text(
+                              t,
+                              style: const TextStyle(
+                                color: HomePage.textMuted,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
+                ),
                 const SizedBox(width: 8),
-                const Spacer(),
                 SizedBox(
                   height: 40,
                   child: FilledButton.icon(
