@@ -1,0 +1,22 @@
+# Azure configuration (contains secrets)
+azure-config.env
+
+# Firebase export data
+data-migration/firebase-export/
+*.json
+*.pyc
+__pycache__/
+
+# Python
+*.py[cod]
+*$py.class
+.Python
+venv/
+env/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
