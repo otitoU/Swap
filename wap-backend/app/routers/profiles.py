@@ -7,8 +7,9 @@ from datetime import datetime
 from app.schemas import ProfileCreate, ProfileUpdate, ProfileResponse
 from app.firebase_db import get_firebase_service
 from app.embeddings import get_embedding_service
-from app.qdrant_client import get_qdrant_service
+from app.azure_search import get_azure_search_service
 from app.cache import get_cache_service
+from app.email_service import get_email_service
 
 router = APIRouter(prefix="/profiles", tags=["profiles"])
 
@@ -30,8 +31,13 @@ def upsert_profile(profile_data: ProfileCreate):
     # Get services
     firebase_service = get_firebase_service()
     embedding_service = get_embedding_service()
-    qdrant_service = get_qdrant_service()
-    
+    search_service = get_azure_search_service()
+    email_service = get_email_service()
+
+    # Check if this is a new profile (for welcome email)
+    existing_profile = firebase_service.get_profile(profile_data.uid)
+    is_new_profile = existing_profile is None
+
     # Prepare profile data for Firestore
     profile_dict = {
         "email": profile_data.email,
@@ -74,8 +80,8 @@ def upsert_profile(profile_data: ProfileCreate):
             "show_city": profile_data.show_city if profile_data.show_city is not None else True,
         }
         
-        # Upsert to Qdrant (use uid as the point ID)
-        qdrant_service.upsert_profile(
+        # Upsert to Azure AI Search (use uid as the document ID)
+        search_service.upsert_profile(
             username=profile_data.uid,
             offer_vec=offer_vec,
             need_vec=need_vec,
@@ -86,8 +92,17 @@ def upsert_profile(profile_data: ProfileCreate):
     cache_service = get_cache_service()
     cleared = cache_service.clear_pattern("search:*")
     if cleared > 0:
-        print(f"🗑️  Cleared {cleared} cached search results (profile updated)")
-    
+        print(f"Cleared {cleared} cached search results (profile updated)")
+
+    # Send welcome email for new profiles (if email updates enabled)
+    if is_new_profile and profile_data.email_updates is not False:
+        email_service.send_welcome(
+            to_email=profile_data.email,
+            user_name=profile_data.display_name,
+            skills_to_offer=profile_data.skills_to_offer,
+            services_needed=profile_data.services_needed,
+        )
+
     return ProfileResponse(**saved_profile)
 
 
@@ -145,8 +160,8 @@ def update_profile(uid: str, profile_update: ProfileUpdate):
     """
     firebase_service = get_firebase_service()
     embedding_service = get_embedding_service()
-    qdrant_service = get_qdrant_service()
-    
+    search_service = get_azure_search_service()
+
     # Check if profile exists
     existing_profile = firebase_service.get_profile(uid)
     if not existing_profile:
@@ -169,7 +184,7 @@ def update_profile(uid: str, profile_update: ProfileUpdate):
             offer_vec = embedding_service.encode(skills_to_offer)
             need_vec = embedding_service.encode(services_needed)
             
-            # Update Qdrant
+            # Update Azure AI Search
             payload = {
                 "uid": uid,
                 "email": updated_profile.get('email'),
@@ -185,8 +200,8 @@ def update_profile(uid: str, profile_update: ProfileUpdate):
                 "dm_open": updated_profile.get('dm_open', True),
                 "show_city": updated_profile.get('show_city', True),
             }
-            
-            qdrant_service.upsert_profile(
+
+            search_service.upsert_profile(
                 username=uid,
                 offer_vec=offer_vec,
                 need_vec=need_vec,
@@ -208,18 +223,18 @@ def delete_profile(uid: str):
         Success message
     """
     firebase_service = get_firebase_service()
-    qdrant_service = get_qdrant_service()
-    
+    search_service = get_azure_search_service()
+
     # Check if profile exists
     existing_profile = firebase_service.get_profile(uid)
     if not existing_profile:
         raise HTTPException(status_code=404, detail="Profile not found")
-    
+
     # Delete from Firestore
     firebase_service.delete_profile(uid)
-    
-    # Delete from Qdrant
-    qdrant_service.delete_profile(uid)
+
+    # Delete from Azure AI Search
+    search_service.delete_profile(uid)
     
     return {"message": "Profile deleted successfully", "uid": uid}
 

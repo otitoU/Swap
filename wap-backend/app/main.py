@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.firebase_db import get_firebase_service
-from app.routers import profiles, search, swaps
+from app.routers import profiles, search, swaps, swap_requests, messages, moderation
 
 # #########################################################################################
 
@@ -21,15 +21,23 @@ from app.routers import profiles, search, swaps
 async def lifespan(app: FastAPI):
     """Lifecycle management for the application."""
     # Startup - Initialize Firebase
-    get_firebase_service()
-    
-    # Pre-load ML model to avoid slow first request
-    from app.embeddings import get_embedding_service
-    print("🔄 Loading ML model...")
-    embedding_service = get_embedding_service()
-    embedding_service.encode("warmup")  # Cache the model in memory
-    print("✅ ML model loaded and ready!")
-    
+    try:
+        get_firebase_service()
+        print("Firebase connected")
+    except Exception as e:
+        print(f"Firebase not configured: {e}")
+
+    # Pre-load ML model (optional - skip if Azure not configured)
+    try:
+        from app.embeddings import get_embedding_service
+        print("Loading embedding model...")
+        embedding_service = get_embedding_service()
+        embedding_service.encode("warmup")
+        print("Embedding model ready!")
+    except Exception as e:
+        print(f"Embedding service not available: {e}")
+        print("Search/matching features will be disabled until Azure is configured")
+
     yield
     # Shutdown
     pass
@@ -55,21 +63,25 @@ app.add_middleware(
 app.include_router(profiles.router)
 app.include_router(search.router)
 app.include_router(swaps.router)
+app.include_router(swap_requests.router)
+app.include_router(messages.router)
+app.include_router(moderation.router)
 
 
 @app.get("/healthz")
 def health_check():
     """Health check endpoint with service status."""
     from app.cache import get_cache_service
-    
+
     cache = get_cache_service()
-    
+
     return {
         "status": "healthy",
         "services": {
             "firebase": "connected",
-            "qdrant": "connected",
-            "redis": "connected" if cache.enabled else "disabled (graceful degradation)"
+            "azure_search": "configured" if settings.azure_search_endpoint else "not configured",
+            "azure_openai": "configured" if settings.azure_openai_endpoint else "not configured",
+            "redis": "connected" if cache.enabled else "disabled",
         }
     }
 
@@ -79,9 +91,10 @@ def root():
     """Root endpoint."""
     return {
         "message": "Welcome to $wap - Skill-for-skill exchange platform",
-        "version": "0.2.0",
+        "version": "0.3.0",
         "database": "Firebase Firestore",
-        "vector_db": "Qdrant",
+        "vector_db": "Azure AI Search",
+        "embeddings": "Azure OpenAI",
         "docs": "/docs",
         "health": "/healthz",
     }

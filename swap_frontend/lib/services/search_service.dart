@@ -53,7 +53,7 @@ class SearchService {
   final String baseUrl;
 
   SearchService({String? baseUrl})
-    : baseUrl = baseUrl ?? 'https://swap-backend.fly.dev';
+    : baseUrl = baseUrl ?? 'http://localhost:8000';
 
   /// Perform a semantic search.
   ///

@@ -4,6 +4,7 @@ import '../pages/post_skill_page.dart';
 import '../pages/home_page.dart';
 import '../pages/profile_page.dart';
 import '../pages/request_page.dart';
+import '../pages/messages/conversations_page.dart';
 
 class AppSidebar extends StatelessWidget {
   const AppSidebar({super.key, this.active = 'Home'});
@@ -64,6 +65,14 @@ class AppSidebar extends StatelessWidget {
             onTap: () => Navigator.of(
               context,
             ).push(MaterialPageRoute(builder: (_) => const RequestsPage())),
+          ),
+          _NavItem(
+            icon: Icons.chat_bubble_outline,
+            label: 'Messages',
+            active: isActive('Messages'),
+            onTap: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const ConversationsPage())),
           ),
           _NavItem(
             icon: Icons.analytics_outlined,

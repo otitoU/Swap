@@ -10,17 +10,18 @@ class Settings(BaseSettings):
     # Firebase (replaces PostgreSQL)
     firebase_credentials_path: Optional[str] = None  # Path to service account JSON
     firebase_credentials_json: Optional[str] = None  # JSON string from env var
-    
-    # Qdrant
-    qdrant_host: str = "localhost"
-    qdrant_port: int = 6333
-    qdrant_url: Optional[str] = None  # Full URL for Qdrant Cloud
-    qdrant_api_key: Optional[str] = None  # API key for Qdrant Cloud
-    qdrant_collection: str = "swap_users"
-    
-    # Embeddings (using smaller, faster model)
-    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
-    vector_dim: int = 384  # MiniLM uses 384 dimensions (vs 768 for BERT)
+
+    # Azure OpenAI (for embeddings)
+    azure_openai_endpoint: Optional[str] = None
+    azure_openai_api_key: Optional[str] = None
+    azure_openai_api_version: str = "2024-02-01"
+    azure_embedding_deployment: str = "text-embedding-3-small"
+    vector_dim: int = 1536  # text-embedding-3-small uses 1536 dimensions
+
+    # Azure AI Search (for vector storage and search)
+    azure_search_endpoint: Optional[str] = None
+    azure_search_api_key: Optional[str] = None
+    azure_search_index: str = "swap-users"
     
     # Redis Cache (optional - disabled in production by default)
     redis_enabled: bool = True  # Set to False to disable caching
@@ -28,7 +29,13 @@ class Settings(BaseSettings):
     redis_port: int = 6379
     redis_ttl: int = 3600  # Cache TTL in seconds (1 hour)
     redis_url: Optional[str] = None  # Full URL for managed Redis (e.g., Upstash)
-    
+
+    # Email (Resend)
+    resend_api_key: Optional[str] = None
+    email_from: str = "onboarding@resend.dev"  # Default Resend test sender
+    email_enabled: bool = True  # Set to False to disable all emails
+    app_url: str = "http://localhost:3000"  # Frontend URL for email links
+
     # App
     app_name: str = "$wap"
     debug: bool = False

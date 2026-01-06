@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 from app.schemas import ProfileSearchResult
 from app.embeddings import get_embedding_service
-from app.qdrant_client import get_qdrant_service
+from app.azure_search import get_azure_search_service
 from app.cache import get_cache_service
 
 router = APIRouter(prefix="/search", tags=["search"])
@@ -25,21 +25,21 @@ class SearchRequest(BaseModel):
 def search_profiles(request: SearchRequest):
     """
     Semantic search for profiles with optional Redis caching.
-    
-    Uses BERT embeddings to find profiles whose skills semantically match
+
+    Uses Azure OpenAI embeddings to find profiles whose skills semantically match
     the search query. Results are cached for 1 hour to improve performance.
-    
+
     Performance:
         - Cache Hit: ~5ms (16x faster)
-        - Cache Miss: ~80ms (normal Qdrant search)
-    
+        - Cache Miss: ~80ms (normal Azure AI Search)
+
     Example:
         Query: "teach me guitar and music"
         Returns: Profiles of people who can teach guitar, music theory, etc.
     """
     cache_service = get_cache_service()
     embedding_service = get_embedding_service()
-    qdrant_service = get_qdrant_service()
+    search_service = get_azure_search_service()
     
     # Try cache first
     cache_key = cache_service._generate_key(
@@ -65,7 +65,7 @@ def search_profiles(request: SearchRequest):
     # Search by mode
     mode = request.mode
     if mode == "offers":
-        results = qdrant_service.search_offers(
+        results = search_service.search_offers(
             query_vec=query_vec,
             limit=request.limit,
             score_threshold=request.score_threshold,
@@ -74,7 +74,7 @@ def search_profiles(request: SearchRequest):
         cache_service.set(cache_key, results, ttl=3600)
         return [ProfileSearchResult(**result) for result in results]
     if mode == "needs":
-        results = qdrant_service.search_needs(
+        results = search_service.search_needs(
             query_vec=query_vec,
             limit=request.limit,
             score_threshold=request.score_threshold,
@@ -82,14 +82,14 @@ def search_profiles(request: SearchRequest):
         # Cache the results
         cache_service.set(cache_key, results, ttl=3600)
         return [ProfileSearchResult(**result) for result in results]
-    
+
     # mode == "both": combine offers and needs; pick the higher score per uid
-    offer_results = qdrant_service.search_offers(
+    offer_results = search_service.search_offers(
         query_vec=query_vec,
         limit=request.limit,
         score_threshold=request.score_threshold,
     )
-    need_results = qdrant_service.search_needs(
+    need_results = search_service.search_needs(
         query_vec=query_vec,
         limit=request.limit,
         score_threshold=request.score_threshold,
@@ -146,8 +146,8 @@ def recommend_skills(request: SkillRecommendationRequest):
     """
     cache_service = get_cache_service()
     embedding_service = get_embedding_service()
-    qdrant_service = get_qdrant_service()
-    
+    search_service = get_azure_search_service()
+
     # Try cache first
     cache_key = cache_service._generate_key(
         "skill_recommend",
@@ -165,13 +165,13 @@ def recommend_skills(request: SkillRecommendationRequest):
     query_vec = embedding_service.encode(request.current_skills)
     
     # Search for people with similar skills (both offers and needs)
-    similar_offers = qdrant_service.search_offers(
+    similar_offers = search_service.search_offers(
         query_vec=query_vec,
         limit=20,
         score_threshold=0.4,
     )
-    
-    similar_needs = qdrant_service.search_needs(
+
+    similar_needs = search_service.search_needs(
         query_vec=query_vec,
         limit=20,
         score_threshold=0.4,

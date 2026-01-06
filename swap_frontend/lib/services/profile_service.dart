@@ -7,7 +7,7 @@ import 'package:flutter/foundation.dart';
 class ProfileService {
   final String baseUrl;
   ProfileService({String? baseUrl})
-    : baseUrl = baseUrl ?? 'https://swap-backend.fly.dev';
+    : baseUrl = baseUrl ?? 'http://localhost:8000';
 
   Future<void> upsertProfile({
     required String uid,
