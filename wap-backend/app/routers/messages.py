@@ -125,16 +125,14 @@ def list_conversations(
     """
     print(f"list_conversations called for uid={uid}")
     
-    # TEMPORARY: Return empty list to avoid Firestore index issues
-    # TODO: Create composite index in Firebase Console for production
-    return ConversationListResponse(conversations=[], total=0, has_more=False)
+    # Get Firebase connection
+    firebase = get_firebase_service()
+    db = firebase.db
     
-    # Original code commented out until index is created:
-    # firebase = get_firebase_service()
-    # db = firebase.db
-    # ... rest of code ...
+    # Fetch conversations for this user
+    all_docs = _fetch_conversations_for_user(db, uid)
     
-    # Sort by updated_at descending (newest first)
+    # Sort by updated_at descending (newest first) - done in Python to avoid index requirement
     all_docs.sort(
         key=lambda d: d.to_dict().get("updated_at") or datetime.min,
         reverse=True
@@ -207,9 +205,10 @@ def get_total_unread(uid: str = Query(..., description="UID of the user")):
     """Get total unread message count across all conversations."""
     print(f"get_total_unread called for uid={uid}")
     
-    # TEMPORARY: Return 0 to avoid Firestore index issues
-    # TODO: Create composite index in Firebase Console for production
-    return {"total_unread": 0}
+    firebase = get_firebase_service()
+    db = firebase.db
+    total_unread = _count_unread_for_user(db, uid)
+    return {"total_unread": total_unread}
 
 
 @router.get("/{conversation_id}", response_model=ConversationResponse)

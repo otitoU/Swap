@@ -22,6 +22,11 @@ router = APIRouter(prefix="/points", tags=["points"])
 PRIORITY_BOOST_COST_PER_HOUR = 5  # 5 points per hour of boost
 REQUEST_WITHOUT_RECIPROCITY_COST = 50  # Flat cost to request without offering
 
+# Indirect swap constants
+POINTS_PER_HOUR_INDIRECT = 10  # Points cost per hour for indirect swaps
+INDIRECT_CREDIT_RATE = 0.5  # Requester gets 50% credits in indirect swaps
+BASE_CREDITS_PER_HOUR = 10  # Base credits earned per hour
+
 
 def _convert_timestamp(value) -> Optional[str]:
     """Convert Firestore timestamp to ISO string."""
@@ -187,6 +192,204 @@ def award_points_for_swap(
     return points
 
 
+def calculate_credits(hours: float, skill_level: str, rate_multiplier: float = 1.0) -> int:
+    """
+    Calculate credits earned from a completed swap.
+    
+    Args:
+        hours: Hours exchanged
+        skill_level: beginner, intermediate, or advanced
+        rate_multiplier: 1.0 for full credits, 0.5 for indirect swap requester
+    
+    Returns:
+        Credits to award
+    """
+    SKILL_MULTIPLIERS = {
+        "beginner": 0.75,
+        "intermediate": 1.0,
+        "advanced": 1.25,
+    }
+    
+    base_credits = hours * BASE_CREDITS_PER_HOUR
+    skill_mult = SKILL_MULTIPLIERS.get(skill_level, 1.0)
+    
+    return max(1, round(base_credits * skill_mult * rate_multiplier))
+
+
+def award_credits(
+    db,
+    uid: str,
+    swap_id: str,
+    credits: int,
+    skill: Optional[str] = None,
+):
+    """
+    Award swap credits to a user.
+    
+    Credits are stored in the profile and can be used for future swaps.
+    """
+    profile_ref = db.collection("profiles").document(uid)
+    profile_doc = profile_ref.get()
+    
+    current_credits = 0
+    if profile_doc.exists:
+        profile = profile_doc.to_dict()
+        current_credits = profile.get("swap_credits", 0)
+    
+    new_credits = current_credits + credits
+    now = datetime.utcnow()
+    
+    # Record the credit transaction
+    db.collection("credits_transactions").add({
+        "uid": uid,
+        "type": "earned",
+        "amount": credits,
+        "balance_after": new_credits,
+        "reason": "swap_completed",
+        "related_swap_id": swap_id,
+        "related_skill": skill,
+        "created_at": now,
+    })
+    
+    # Update profile
+    profile_ref.update({
+        "swap_credits": new_credits,
+        "updated_at": now,
+    })
+    
+    return credits
+
+
+def award_direct_swap_completion(
+    db,
+    requester_uid: str,
+    recipient_uid: str,
+    swap_id: str,
+    hours: float,
+    skill_level: str,
+    requester_skill: Optional[str] = None,
+    recipient_skill: Optional[str] = None,
+) -> dict:
+    """
+    Award points and credits for a direct skill swap completion.
+    
+    Both parties earn full points and credits.
+    
+    Returns:
+        Dictionary with points and credits awarded to each party
+    """
+    # Award requester (they taught their skill)
+    requester_points = award_points_for_swap(
+        db, requester_uid, swap_id, hours, skill_level, requester_skill
+    )
+    requester_credits = calculate_credits(hours, skill_level, 1.0)
+    award_credits(db, requester_uid, swap_id, requester_credits, requester_skill)
+    
+    # Award recipient (they taught their skill)
+    recipient_points = award_points_for_swap(
+        db, recipient_uid, swap_id, hours, skill_level, recipient_skill
+    )
+    recipient_credits = calculate_credits(hours, skill_level, 1.0)
+    award_credits(db, recipient_uid, swap_id, recipient_credits, recipient_skill)
+    
+    # Update swap completion counts and hours traded
+    _increment_swap_count(db, requester_uid, hours)
+    _increment_swap_count(db, recipient_uid, hours)
+    
+    return {
+        "requester_points": requester_points,
+        "requester_credits": requester_credits,
+        "recipient_points": recipient_points,
+        "recipient_credits": recipient_credits,
+    }
+
+
+def award_indirect_swap_completion(
+    db,
+    requester_uid: str,
+    provider_uid: str,
+    swap_id: str,
+    hours: float,
+    skill_level: str,
+    points_paid: int,
+    skill: Optional[str] = None,
+) -> dict:
+    """
+    Award points and credits for an indirect swap completion.
+    
+    - Provider (recipient): Earns full points + credits
+    - Requester: Earns reduced credits only (already paid points)
+    
+    The reserved points were already deducted when the swap was created,
+    so no additional deduction needed.
+    
+    Returns:
+        Dictionary with points and credits awarded to each party
+    """
+    # Provider (recipient) gets full points and credits
+    provider_points = award_points_for_swap(
+        db, provider_uid, swap_id, hours, skill_level, skill
+    )
+    provider_credits = calculate_credits(hours, skill_level, 1.0)
+    award_credits(db, provider_uid, swap_id, provider_credits, skill)
+    
+    # Requester gets reduced credits only (no points - they paid points)
+    requester_credits = calculate_credits(hours, skill_level, INDIRECT_CREDIT_RATE)
+    award_credits(db, requester_uid, swap_id, requester_credits, skill)
+    
+    # Mark the reserved points as officially spent (update transaction reason)
+    _finalize_indirect_payment(db, requester_uid, swap_id, points_paid)
+    
+    # Update swap completion counts and hours traded
+    _increment_swap_count(db, requester_uid, hours)
+    _increment_swap_count(db, provider_uid, hours)
+    
+    return {
+        "requester_points": 0,  # Requester paid points, doesn't earn any
+        "requester_credits": requester_credits,
+        "provider_points": provider_points,
+        "provider_credits": provider_credits,
+        "points_paid": points_paid,
+    }
+
+
+def _increment_swap_count(db, uid: str, hours: float = 0):
+    """Increment the completed swap count and hours traded for a user."""
+    profile_ref = db.collection("profiles").document(uid)
+    profile_doc = profile_ref.get()
+    
+    if profile_doc.exists:
+        profile = profile_doc.to_dict()
+        current_count = profile.get("completed_swap_count", 0)
+        current_hours = profile.get("total_hours_traded", 0.0)
+        profile_ref.update({
+            "completed_swap_count": current_count + 1,
+            "total_hours_traded": current_hours + hours,
+            "updated_at": datetime.utcnow(),
+        })
+
+
+def _finalize_indirect_payment(db, uid: str, swap_id: str, amount: int):
+    """
+    Update the reserved points transaction to indicate payment is finalized.
+    
+    This is for tracking purposes - the points were already deducted during reservation.
+    """
+    now = datetime.utcnow()
+    
+    # Add a finalization record
+    db.collection("points_transactions").add({
+        "uid": uid,
+        "type": "spent",
+        "amount": 0,  # No additional deduction
+        "balance_after": None,  # Will be calculated
+        "reason": PointsTransactionReason.indirect_swap_payment.value,
+        "related_swap_id": swap_id,
+        "note": f"Finalized payment of {amount} points for indirect swap",
+        "created_at": now,
+    })
+
+
 @router.get("/balance/{uid}", response_model=PointsBalanceResponse)
 def get_points_balance(
     uid: str,
@@ -213,14 +416,15 @@ def get_points_balance(
     recent_transactions = []
 
     if include_transactions:
-        # Get recent transactions
+        # Get recent transactions (without order_by to avoid requiring composite index)
         transactions_query = db.collection("points_transactions").where(
             filter=FieldFilter("uid", "==", uid)
-        ).order_by("created_at", direction="DESCENDING").limit(transaction_limit)
+        )
 
+        all_transactions = []
         for doc in transactions_query.stream():
             data = doc.to_dict()
-            recent_transactions.append(PointsTransaction(
+            all_transactions.append(PointsTransaction(
                 id=doc.id,
                 uid=data.get("uid"),
                 type=PointsTransactionType(data.get("type")),
@@ -231,6 +435,10 @@ def get_points_balance(
                 related_skill=data.get("related_skill"),
                 created_at=_convert_timestamp(data.get("created_at")) or datetime.utcnow().isoformat(),
             ))
+
+        # Sort by created_at descending and limit in Python
+        all_transactions.sort(key=lambda x: x.created_at, reverse=True)
+        recent_transactions = all_transactions[:transaction_limit]
 
     return PointsBalanceResponse(
         uid=uid,
@@ -253,7 +461,7 @@ def get_points_history(
     firebase = get_firebase_service()
     db = firebase.db
 
-    # Build query
+    # Build query (without order_by to avoid requiring composite index)
     query = db.collection("points_transactions").where(
         filter=FieldFilter("uid", "==", uid)
     )
@@ -261,10 +469,14 @@ def get_points_history(
     if type_filter:
         query = query.where(filter=FieldFilter("type", "==", type_filter))
 
-    query = query.order_by("created_at", direction="DESCENDING")
-
-    # Get all for count (pagination)
+    # Get all documents
     all_docs = list(query.stream())
+
+    # Sort by created_at descending in Python
+    all_docs.sort(
+        key=lambda doc: doc.to_dict().get("created_at", datetime.min),
+        reverse=True
+    )
     total = len(all_docs)
 
     # Apply pagination

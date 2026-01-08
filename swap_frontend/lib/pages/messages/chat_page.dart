@@ -376,12 +376,20 @@ class _ChatPageState extends State<ChatPage> {
 
     // Determine banner based on status
     if (swap.isCompleted) {
-      return _buildBanner(
-        icon: Icons.check_circle,
-        color: const Color(0xFF22C55E),
-        text: 'Swap completed! Don\'t forget to leave a review.',
-        actionLabel: 'Leave Review',
-        onAction: () => _showReviewDialog(),
+      // Show earnings summary
+      final pointsEarned = isRequester
+          ? swap.completion?.requesterPointsEarned ?? 0
+          : swap.completion?.recipientPointsEarned ?? 0;
+      final creditsEarned = isRequester
+          ? swap.completion?.requesterCreditsEarned ?? 0
+          : swap.completion?.recipientCreditsEarned ?? 0;
+
+      return _buildCompletedBanner(
+        pointsEarned: pointsEarned,
+        creditsEarned: creditsEarned,
+        hours: swap.completion?.finalHours ?? 0,
+        swapType: swap.swapType,
+        onReview: () => _showReviewDialog(),
       );
     }
 
@@ -424,10 +432,13 @@ class _ChatPageState extends State<ChatPage> {
     }
 
     if (swap.isAccepted) {
+      final swapTypeText = swap.isDirect 
+          ? 'Skill exchange' 
+          : 'Points-based (${swap.pointsReserved ?? swap.pointsOffered ?? 0} pts)';
       return _buildBanner(
         icon: Icons.handshake,
         color: const Color(0xFF7C3AED),
-        text: 'Swap accepted! Mark complete when you\'re done.',
+        text: '$swapTypeText swap accepted! Mark complete when done.',
         actionLabel: 'Mark Complete',
         onAction: () => _showMarkCompleteDialog(),
       );
@@ -469,6 +480,186 @@ class _ChatPageState extends State<ChatPage> {
               ),
               child: Text(actionLabel),
             ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCompletedBanner({
+    required int pointsEarned,
+    required int creditsEarned,
+    required double hours,
+    required SwapType swapType,
+    required VoidCallback onReview,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFF22C55E).withOpacity(0.15),
+            const Color(0xFF10B981).withOpacity(0.1),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        border: Border(
+          bottom: BorderSide(color: const Color(0xFF22C55E).withOpacity(0.3)),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF22C55E).withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.check_circle,
+                  color: Color(0xFF22C55E),
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Swap Completed!',
+                      style: TextStyle(
+                        color: Color(0xFF22C55E),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                      ),
+                    ),
+                    Text(
+                      '${hours.toStringAsFixed(1)} hours exchanged',
+                      style: TextStyle(
+                        color: HomePage.textMuted,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: swapType == SwapType.direct
+                      ? HomePage.accent.withOpacity(0.2)
+                      : HomePage.accentAlt.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      swapType == SwapType.direct ? Icons.swap_horiz : Icons.toll,
+                      size: 14,
+                      color: swapType == SwapType.direct
+                          ? HomePage.accent
+                          : HomePage.accentAlt,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      swapType.displayName,
+                      style: TextStyle(
+                        color: swapType == SwapType.direct
+                            ? HomePage.accent
+                            : HomePage.accentAlt,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Earnings row
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: HomePage.surface,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: HomePage.line),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.toll, color: Color(0xFFF59E0B), size: 20),
+                      const SizedBox(width: 6),
+                      Text(
+                        '+$pointsEarned',
+                        style: TextStyle(
+                          color: pointsEarned > 0 ? const Color(0xFFF59E0B) : HomePage.textMuted,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'pts',
+                        style: TextStyle(
+                          color: HomePage.textMuted,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(width: 1, height: 30, color: HomePage.line),
+                Expanded(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.stars, color: HomePage.accentAlt, size: 20),
+                      const SizedBox(width: 6),
+                      Text(
+                        '+$creditsEarned',
+                        style: const TextStyle(
+                          color: HomePage.accentAlt,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'credits',
+                        style: TextStyle(
+                          color: HomePage.textMuted,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: onReview,
+              icon: const Icon(Icons.rate_review, size: 18),
+              label: const Text('Leave a Review'),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF22C55E),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+          ),
         ],
       ),
     );

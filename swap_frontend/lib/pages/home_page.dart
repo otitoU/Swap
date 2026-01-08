@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'landing_page.dart';
 import 'dart:async'; // for TimeoutException
 import '../services/search_service.dart';
@@ -224,6 +225,7 @@ class _DiscoverPaneState extends State<_DiscoverPane> {
 
   Future<void> _loadSkillsFromFirestore() async {
     try {
+      final currentUid = FirebaseAuth.instance.currentUser?.uid;
       final snapshot = await FirebaseFirestore.instance
           .collection('skills')
           .get();
@@ -245,9 +247,14 @@ class _DiscoverPaneState extends State<_DiscoverPane> {
         );
       }).toList();
 
+      // Filter out current user's own skills - they shouldn't see their own posts
+      final filteredSkills = loadedSkills
+          .where((skill) => skill.creatorUid != currentUid)
+          .toList();
+
       if (mounted) {
         setState(() {
-          skills = loadedSkills;
+          skills = filteredSkills;
           _loadingSkills = false;
         });
       }
@@ -802,7 +809,16 @@ class _SkillCard extends StatelessWidget {
                 SizedBox(
                   height: 40,
                   child: FilledButton.icon(
-                    onPressed: () {},
+                    onPressed: () {
+                      if (skill.creatorUid.isNotEmpty) {
+                        showSwapRequestDialog(
+                          context,
+                          recipientUid: skill.creatorUid,
+                          recipientName: skill.creatorName,
+                          preSelectedSkill: skill.title,
+                        );
+                      }
+                    },
                     icon: const Icon(Icons.mail_outline, size: 18),
                     label: const Text('Request'),
                     style: FilledButton.styleFrom(

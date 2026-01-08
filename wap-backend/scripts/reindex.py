@@ -19,12 +19,14 @@ def skills_to_text(skills):
     if isinstance(skills, str):
         return skills
     if isinstance(skills, list):
-        # Convert array of objects like [{name, category, level}, ...] to text
+        # Convert array of objects like [{name/title, category, level/difficulty}, ...] to text
         parts = []
         for s in skills:
             if isinstance(s, dict):
-                name = s.get('name', '')
-                level = s.get('level', '')
+                # Handle both 'name' (profile) and 'title' (skills collection) fields
+                name = s.get('name') or s.get('title', '')
+                # Handle both 'level' (profile) and 'difficulty' (skills collection)
+                level = s.get('level') or s.get('difficulty', '')
                 if name:
                     parts.append(f"{name} ({level})" if level else name)
             elif isinstance(s, str):
@@ -51,17 +53,28 @@ def reindex_all_profiles():
         print(f"[{i}/{len(profiles)}] Indexing {uid}...")
 
         try:
-            # Handle both camelCase (frontend) and snake_case (backend) field names
-            skills_to_offer = skills_to_text(
-                profile.get('skills_to_offer') or profile.get('skillsToOffer')
-            )
+            # Get skills from skills collection (single source of truth)
+            user_skills = firebase_service.get_skills_by_user(uid)
+            skills_to_offer = skills_to_text(user_skills) if user_skills else None
+            
+            # If no posted skills, fall back to profile.skillsToOffer for backwards compat
+            if not skills_to_offer:
+                skills_to_offer = skills_to_text(
+                    profile.get('skills_to_offer') or profile.get('skillsToOffer')
+                )
+            
+            # Get services needed from profile (users specify what they need)
             services_needed = skills_to_text(
                 profile.get('services_needed') or profile.get('servicesNeeded')
             )
             
-            if not skills_to_offer or not services_needed:
-                print(f"  ⊘ Skipped {uid} (no skills defined)")
+            if not skills_to_offer and not services_needed:
+                print(f"  ⊘ Skipped {uid} (no skills or needs defined)")
                 continue
+            
+            # Use placeholder if one is missing (so we can still index partial profiles)
+            skills_to_offer = skills_to_offer or "general help"
+            services_needed = services_needed or "general services"
             
             # Generate embeddings
             offer_vec = embedding_service.encode(skills_to_offer)
@@ -91,7 +104,7 @@ def reindex_all_profiles():
                 need_vec=need_vec,
                 payload=payload,
             )
-            print(f"  ✓ Indexed {uid}")
+            print(f"  ✓ Indexed {uid} (skills: {skills_to_offer[:50]}...)")
             
         except Exception as e:
             print(f"  ✗ Error indexing {uid}: {e}")

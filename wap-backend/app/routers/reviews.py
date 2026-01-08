@@ -152,11 +152,13 @@ def _update_user_review_stats(db, uid: str):
     avg_rating = sum(ratings) / len(ratings) if ratings else 0.0
     review_count = len(ratings)
 
-    # Update profile
+    # Update profile (using camelCase for frontend compatibility)
     profile_ref = db.collection("profiles").document(uid)
     profile_ref.update({
         "average_rating": round(avg_rating, 2),
+        "avgRating": round(avg_rating, 2),  # Alias for frontend
         "review_count": review_count,
+        "reviewsCount": review_count,  # Alias for frontend
         "updated_at": datetime.utcnow(),
     })
 
@@ -215,13 +217,17 @@ def get_user_reviews(
     firebase = get_firebase_service()
     db = firebase.db
 
-    # Query reviews for this user
+    # Query reviews for this user (sorted in Python to avoid index requirement)
     query = db.collection("reviews").where(
         filter=FieldFilter("reviewed_uid", "==", uid)
-    ).order_by("created_at", direction="DESCENDING")
+    )
 
-    # Get total count (approximate - Firestore doesn't have efficient count)
+    # Get all reviews and sort in Python
     all_reviews = list(query.stream())
+    all_reviews.sort(
+        key=lambda doc: doc.to_dict().get("created_at") or datetime.min,
+        reverse=True
+    )
     total = len(all_reviews)
 
     # Calculate average rating
@@ -259,13 +265,17 @@ def get_reviews_given(
     firebase = get_firebase_service()
     db = firebase.db
 
-    # Query reviews by this user
+    # Query reviews by this user (sorted in Python to avoid index requirement)
     query = db.collection("reviews").where(
         filter=FieldFilter("reviewer_uid", "==", uid)
-    ).order_by("created_at", direction="DESCENDING")
+    )
 
-    # Get all for count
+    # Get all reviews and sort in Python
     all_reviews = list(query.stream())
+    all_reviews.sort(
+        key=lambda doc: doc.to_dict().get("created_at") or datetime.min,
+        reverse=True
+    )
     total = len(all_reviews)
 
     # Calculate average rating given

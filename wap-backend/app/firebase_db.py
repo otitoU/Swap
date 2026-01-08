@@ -207,6 +207,58 @@ class FirebaseService:
         
         return None
 
+    def get_skills_collection(self):
+        """Get skills collection reference."""
+        return self.db.collection('skills')
+
+    def get_skills_by_user(self, uid: str) -> List[Dict[str, Any]]:
+        """
+        Get all skills posted by a user.
+        
+        Args:
+            uid: Firebase Auth UID of the creator
+            
+        Returns:
+            List of skills posted by the user
+        """
+        docs = self.get_skills_collection().where(
+            filter=FieldFilter("creatorUid", "==", uid)
+        ).stream()
+        
+        skills = []
+        for doc in docs:
+            data = doc.to_dict()
+            skills.append({
+                "id": doc.id,
+                "title": data.get("title", ""),
+                "category": data.get("category", ""),
+                "difficulty": data.get("difficulty", "Intermediate"),
+                "description": data.get("description", ""),
+                "estimatedHours": data.get("estimatedHours", 1),
+                "deliveryFormat": data.get("deliveryFormat", "Remote"),
+                "tags": data.get("tags", []),
+            })
+        
+        return skills
+
+    def get_services_needed_by_user(self, uid: str) -> List[Dict[str, Any]]:
+        """
+        Get services needed by a user from their profile.
+        
+        Args:
+            uid: Firebase Auth UID
+            
+        Returns:
+            List of services needed
+        """
+        profile = self.get_profile(uid)
+        if not profile:
+            return []
+        
+        # Handle both camelCase and snake_case
+        services = profile.get('servicesNeeded') or profile.get('services_needed') or []
+        return services if isinstance(services, list) else []
+
 
 # Global instance
 _firebase_service = None

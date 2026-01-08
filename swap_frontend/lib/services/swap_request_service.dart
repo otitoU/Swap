@@ -36,25 +36,35 @@ class SwapRequestService {
   }
 
   /// Create a new swap request.
+  /// 
+  /// For direct swaps: provide requesterOffer (the skill you're offering).
+  /// For indirect swaps: provide pointsOffered (points to pay for the service).
   Future<SwapRequest> createRequest({
     required String requesterUid,
     required String recipientUid,
-    required String requesterOffer,
     required String requesterNeed,
+    String? requesterOffer,
     String? message,
+    SwapType swapType = SwapType.direct,
+    int? pointsOffered,
   }) async {
     final uri = Uri.parse('$baseUrl/swap-requests').replace(
       queryParameters: {'requester_uid': requesterUid},
     );
 
-    debugPrint('SwapRequestService: POST $uri');
+    debugPrint('SwapRequestService: POST $uri (swapType: ${swapType.name})');
 
     final headers = await _getHeaders();
     final body = jsonEncode({
       'recipient_uid': recipientUid,
-      'requester_offer': requesterOffer,
       'requester_need': requesterNeed,
-      if (message != null && message.isNotEmpty) 'message': message,
+      'swap_type': swapType.name,
+      if (requesterOffer != null && requesterOffer.isNotEmpty) 
+        'requester_offer': requesterOffer,
+      if (message != null && message.isNotEmpty) 
+        'message': message,
+      if (swapType == SwapType.indirect && pointsOffered != null) 
+        'points_offered': pointsOffered,
     });
 
     final response = await http
@@ -212,7 +222,7 @@ class SwapRequestService {
     final uri = Uri.parse('$baseUrl/swaps/$requestId/complete')
         .replace(queryParameters: {'uid': uid});
 
-    debugPrint('SwapRequestService: POST $uri (marking complete)');
+    debugPrint('SwapRequestService: POST $uri (marking complete with $hoursExchanged hours)');
 
     final headers = await _getHeaders();
     final body = jsonEncode({
@@ -231,8 +241,9 @@ class SwapRequestService {
           'Failed to mark complete: ${response.statusCode} $errorBody');
     }
 
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
-    return SwapRequest.fromJson(data);
+    // The completion endpoint returns SwapCompletionStatus, but we need
+    // the full SwapRequest. Fetch it again to get the updated data.
+    return await getRequest(requestId, uid);
   }
 
   /// Verify or dispute a swap completion.
@@ -263,8 +274,9 @@ class SwapRequestService {
           'Failed to verify completion: ${response.statusCode} $errorBody');
     }
 
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
-    return SwapRequest.fromJson(data);
+    // The verify endpoint returns SwapCompletionStatus, but we need
+    // the full SwapRequest. Fetch it again to get the updated data.
+    return await getRequest(requestId, uid);
   }
 
   /// Get completion status for a swap.

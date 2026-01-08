@@ -1,6 +1,7 @@
 // lib/pages/profile_setup_flow.dart
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:async'; // for TimeoutException
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -40,8 +41,9 @@ class _ProfileSetupFlowState extends State<ProfileSetupFlow> {
   String? _timezone;
   int _step = 0;
 
-  // Avatar sources
-  File? _avatar; // newly picked image (local)
+  // Avatar sources (web-compatible)
+  Uint8List? _avatarBytes; // picked image bytes (works on web)
+  String? _avatarName; // file name
   String? _existingPhotoUrl; // existing photo from Firestore/Auth
 
   // Step 2: Skills to Offer (structured rows)
@@ -180,7 +182,13 @@ class _ProfileSetupFlowState extends State<ProfileSetupFlow> {
       source: ImageSource.gallery,
       imageQuality: 85,
     );
-    if (x != null) setState(() => _avatar = File(x.path));
+    if (x != null) {
+      final bytes = await x.readAsBytes();
+      setState(() {
+        _avatarBytes = bytes;
+        _avatarName = x.name;
+      });
+    }
   }
 
   void _next() {
@@ -212,13 +220,13 @@ class _ProfileSetupFlowState extends State<ProfileSetupFlow> {
 
       // Upload avatar if a new one was picked
       String? photoUrl;
-      if (_avatar != null) {
+      if (_avatarBytes != null) {
         try {
           final ref = FirebaseStorage.instance
               .ref()
               .child('user_avatars')
               .child('${user.uid}.jpg');
-          await ref.putFile(_avatar!);
+          await ref.putData(_avatarBytes!, SettableMetadata(contentType: 'image/jpeg'));
           photoUrl = await ref.getDownloadURL();
         } catch (e) {
           debugPrint('Error uploading avatar: $e');
@@ -451,7 +459,7 @@ class _ProfileSetupFlowState extends State<ProfileSetupFlow> {
                                 timezones: _timezones,
                                 onTimezoneChanged: (v) =>
                                     setState(() => _timezone = v),
-                                avatar: _avatar,
+                                avatarBytes: _avatarBytes,
                                 existingPhotoUrl: _existingPhotoUrl,
                                 onPickAvatar: _pickAvatar,
                               ),
@@ -621,7 +629,7 @@ class _StepProfile extends StatelessWidget {
   final void Function(String?) onTimezoneChanged;
 
   // Avatar sources
-  final File? avatar; // newly picked
+  final Uint8List? avatarBytes; // newly picked image bytes (web-compatible)
   final String? existingPhotoUrl; // existing from Firestore/Auth
 
   final VoidCallback onPickAvatar;
@@ -636,7 +644,7 @@ class _StepProfile extends StatelessWidget {
     required this.timezone,
     required this.timezones,
     required this.onTimezoneChanged,
-    required this.avatar,
+    required this.avatarBytes,
     required this.existingPhotoUrl,
     required this.onPickAvatar,
   });
@@ -645,8 +653,8 @@ class _StepProfile extends StatelessWidget {
   Widget build(BuildContext context) {
     // decide which image to preview
     ImageProvider? previewProvider;
-    if (avatar != null) {
-      previewProvider = FileImage(avatar!);
+    if (avatarBytes != null) {
+      previewProvider = MemoryImage(avatarBytes!);
     } else if (existingPhotoUrl != null && existingPhotoUrl!.isNotEmpty) {
       previewProvider = NetworkImage(existingPhotoUrl!);
     }

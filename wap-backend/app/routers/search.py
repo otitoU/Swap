@@ -1,13 +1,14 @@
 """Search endpoints."""
 
-from typing import List, Literal, Dict, Any
-from fastapi import APIRouter
+from typing import List, Literal, Dict, Any, Optional
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from app.schemas import ProfileSearchResult
 from app.embeddings import get_embedding_service
 from app.azure_search import get_azure_search_service
 from app.cache import get_cache_service
+from app.firebase_db import get_firebase_service
 
 router = APIRouter(prefix="/search", tags=["search"])
 
@@ -226,4 +227,122 @@ def recommend_skills(request: SkillRecommendationRequest):
     cache_service.set(cache_key, recommendations, ttl=7200)
     
     return [SkillRecommendation(**rec) for rec in recommendations]
+
+
+def _skills_to_text(skills):
+    """Convert skills array or string to text for embeddings."""
+    if not skills:
+        return None
+    if isinstance(skills, str):
+        return skills
+    if isinstance(skills, list):
+        parts = []
+        for s in skills:
+            if isinstance(s, dict):
+                name = s.get('name') or s.get('title', '')
+                level = s.get('level') or s.get('difficulty', '')
+                if name:
+                    parts.append(f"{name} ({level})" if level else name)
+            elif isinstance(s, str):
+                parts.append(s)
+        return ', '.join(parts) if parts else None
+    return None
+
+
+class ReindexUserRequest(BaseModel):
+    """Request to reindex a single user."""
+    uid: str = Field(..., description="User ID to reindex")
+
+
+class ReindexResponse(BaseModel):
+    """Response from reindex operation."""
+    success: bool
+    message: str
+    skills_indexed: Optional[str] = None
+
+
+@router.post("/reindex-user", response_model=ReindexResponse)
+def reindex_user(request: ReindexUserRequest):
+    """
+    Reindex a single user's skills in Azure AI Search.
+    
+    This should be called after a user posts a new skill to update
+    the search index with their latest skills.
+    
+    Args:
+        request: Contains the user ID to reindex
+        
+    Returns:
+        Success status and message
+    """
+    firebase_service = get_firebase_service()
+    embedding_service = get_embedding_service()
+    azure_search_service = get_azure_search_service()
+    
+    uid = request.uid
+    
+    try:
+        # Get user profile
+        profile = firebase_service.get_profile(uid)
+        if not profile:
+            raise HTTPException(status_code=404, detail=f"Profile not found for uid: {uid}")
+        
+        # Get skills from skills collection (single source of truth)
+        user_skills = firebase_service.get_skills_by_user(uid)
+        skills_to_offer = _skills_to_text(user_skills) if user_skills else None
+        
+        # Fallback to profile.skillsToOffer for backwards compat
+        if not skills_to_offer:
+            skills_to_offer = _skills_to_text(
+                profile.get('skills_to_offer') or profile.get('skillsToOffer')
+            )
+        
+        # Get services needed from profile
+        services_needed = _skills_to_text(
+            profile.get('services_needed') or profile.get('servicesNeeded')
+        )
+        
+        # Use placeholder if missing
+        skills_to_offer = skills_to_offer or "general help"
+        services_needed = services_needed or "general services"
+        
+        # Generate embeddings
+        offer_vec = embedding_service.encode(skills_to_offer)
+        need_vec = embedding_service.encode(services_needed)
+        
+        # Prepare payload
+        payload = {
+            "uid": uid,
+            "email": profile.get('email'),
+            "display_name": profile.get('display_name') or profile.get('displayName') or profile.get('fullName'),
+            "photo_url": profile.get('photo_url') or profile.get('photoUrl'),
+            "full_name": profile.get('full_name') or profile.get('fullName'),
+            "username": profile.get('username'),
+            "bio": profile.get('bio'),
+            "city": profile.get('city'),
+            "timezone": profile.get('timezone'),
+            "skills_to_offer": skills_to_offer,
+            "services_needed": services_needed,
+            "dm_open": profile.get('dm_open', profile.get('dmOpen', True)),
+            "show_city": profile.get('show_city', profile.get('showCity', True)),
+        }
+        
+        # Upsert to Azure AI Search
+        azure_search_service.upsert_profile(
+            username=uid,
+            offer_vec=offer_vec,
+            need_vec=need_vec,
+            payload=payload,
+        )
+        
+        return ReindexResponse(
+            success=True,
+            message=f"Successfully reindexed user {uid}",
+            skills_indexed=skills_to_offer
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to reindex user: {str(e)}")
 

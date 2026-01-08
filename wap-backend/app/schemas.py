@@ -136,13 +136,21 @@ class SkillLevel(str, Enum):
     advanced = "advanced"
 
 
+class SwapType(str, Enum):
+    """Type of swap exchange."""
+    direct = "direct"      # Both users exchange skills
+    indirect = "indirect"  # Requester pays points, provider teaches
+
+
 class SwapRequestCreate(BaseModel):
     """Schema for creating a swap request."""
 
     recipient_uid: str = Field(..., description="UID of person to swap with")
-    requester_offer: str = Field(..., description="What you're offering in the swap")
+    requester_offer: Optional[str] = Field(None, description="What you're offering in the swap (required for direct)")
     requester_need: str = Field(..., description="What you need from them")
     message: Optional[str] = Field(None, max_length=500, description="Optional intro message")
+    swap_type: SwapType = Field(SwapType.direct, description="Type of swap: direct (skill exchange) or indirect (pay with points)")
+    points_offered: Optional[int] = Field(None, ge=1, description="Points offered for indirect swap (required if indirect)")
 
 
 class SwapRequestAction(BaseModel):
@@ -169,8 +177,11 @@ class SwapRequestResponse(BaseModel):
     requester_uid: str
     recipient_uid: str
     status: SwapRequestStatus
-    requester_offer: str
+    swap_type: SwapType = SwapType.direct
+    requester_offer: Optional[str] = None
     requester_need: str
+    points_offered: Optional[int] = None
+    points_reserved: Optional[int] = None  # Points held during pending indirect swap
     message: Optional[str] = None
     created_at: datetime
     updated_at: datetime
@@ -178,6 +189,7 @@ class SwapRequestResponse(BaseModel):
     conversation_id: Optional[str] = None
     requester_profile: Optional[SwapParticipant] = None
     recipient_profile: Optional[SwapParticipant] = None
+    completion: Optional[dict] = None  # Completion data (dynamic)
 
 
 # =============================================================================
@@ -332,16 +344,36 @@ class ParticipantCompletion(BaseModel):
     notes: Optional[str] = None
 
 
+class SwapCompletionResponse(BaseModel):
+    """Completion data for SwapRequestResponse - matches frontend expectations."""
+
+    requester: Optional[ParticipantCompletion] = None
+    recipient: Optional[ParticipantCompletion] = None
+    auto_complete_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    final_hours: Optional[float] = None
+    requester_points_earned: Optional[int] = None
+    requester_credits_earned: Optional[int] = None
+    recipient_points_earned: Optional[int] = None
+    recipient_credits_earned: Optional[int] = None
+
+
 class SwapCompletionStatus(BaseModel):
     """Current completion status for a swap."""
 
     swap_request_id: str
     status: SwapRequestStatus
+    swap_type: SwapType = SwapType.direct
     requester_completion: Optional[ParticipantCompletion] = None
     recipient_completion: Optional[ParticipantCompletion] = None
     auto_complete_at: Optional[datetime] = None  # When auto-completion will trigger
     completed_at: Optional[datetime] = None
     final_hours: Optional[float] = None  # Agreed hours after verification
+    # Earnings awarded on completion
+    requester_points_earned: Optional[int] = None
+    requester_credits_earned: Optional[int] = None
+    recipient_points_earned: Optional[int] = None
+    recipient_credits_earned: Optional[int] = None
 
 
 # =============================================================================
@@ -397,6 +429,9 @@ class PointsTransactionReason(str, Enum):
     swap_completed = "swap_completed"
     priority_boost = "priority_boost"
     request_without_reciprocity = "request_without_reciprocity"
+    indirect_swap_payment = "indirect_swap_payment"  # Points paid for indirect swap
+    indirect_swap_reserved = "indirect_swap_reserved"  # Points held for pending indirect
+    indirect_swap_refund = "indirect_swap_refund"  # Points refunded if declined/cancelled
     bonus = "bonus"  # For promotions, etc.
 
 

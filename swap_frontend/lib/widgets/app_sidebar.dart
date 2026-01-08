@@ -4,6 +4,7 @@ import '../pages/post_skill_page.dart';
 import '../pages/home_page.dart';
 import '../pages/profile_page.dart';
 import '../pages/request_page.dart';
+import '../pages/my_swaps_page.dart';
 import '../pages/messages/conversations_page.dart';
 
 class AppSidebar extends StatelessWidget {
@@ -65,6 +66,14 @@ class AppSidebar extends StatelessWidget {
             onTap: () => Navigator.of(
               context,
             ).push(MaterialPageRoute(builder: (_) => const RequestsPage())),
+          ),
+          _NavItem(
+            icon: Icons.swap_horiz,
+            label: 'My Swaps',
+            active: isActive('My Swaps'),
+            onTap: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const MySwapsPage())),
           ),
           _NavItem(
             icon: Icons.chat_bubble_outline,

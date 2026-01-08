@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'home_page.dart';
 import '../widgets/app_sidebar.dart';
+
+const String _apiBaseUrl = 'http://localhost:8000';
 
 // Color palette used throughout the page
 const Color backgroundColor = Color(0xFF0F0F11);
@@ -128,6 +132,30 @@ class _PostSkillPageState extends State<PostSkillPage> {
 
       // Save to Firestore 'skills' collection
       await FirebaseFirestore.instance.collection('skills').add(skillData);
+
+      // Also add to user's profile skillsToOffer so it appears in swap dialogs
+      await FirebaseFirestore.instance.collection('profiles').doc(user.uid).set({
+        'skillsToOffer': FieldValue.arrayUnion([
+          {
+            'name': _titleController.text.trim(),
+            'level': _difficulty,
+            'category': _category,
+          }
+        ]),
+      }, SetOptions(merge: true));
+
+      // Trigger Azure Search reindex for this user
+      try {
+        await http.post(
+          Uri.parse('$_apiBaseUrl/search/reindex-user'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'uid': user.uid}),
+        );
+        debugPrint('✅ User reindexed for search');
+      } catch (e) {
+        // Don't fail the whole operation if reindex fails
+        debugPrint('⚠️ Failed to reindex user for search: $e');
+      }
 
       if (!mounted) return;
 
