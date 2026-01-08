@@ -4,6 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:firebase_storage/firebase_storage.dart' as storage;
 
 import '../widgets/app_sidebar.dart';
+import '../services/portfolio_service.dart';
+import '../services/review_service.dart';
+import '../models/portfolio.dart';
+import '../models/review.dart';
 import 'home_page.dart';
 import 'post_skill_page.dart';
 import 'onboarding.dart';
@@ -61,12 +65,22 @@ class ProfilePage extends StatelessWidget {
                   final topRated = (data['topRated'] ?? false) == true;
                   final joinedAt = _parseJoinedAt(data['joinedAt']);
 
-                  // Stats (fallbacks)
-                  final swapsCompleted = (data['swapsCompleted'] ?? 0) as int;
-                  final hoursTraded = (data['hoursTraded'] ?? 0) as int;
-                  final avgRating = (data['avgRating'] ?? 0).toDouble();
+                  // Stats (from portfolio data or fallbacks)
+                  final swapsCompleted = (data['completed_swap_count'] ??
+                      data['swapsCompleted'] ??
+                      0) as int;
+                  final hoursTraded = (data['total_hours_traded'] ??
+                          data['hoursTraded'] ??
+                          0)
+                      .toDouble();
+                  final avgRating = (data['average_rating'] ??
+                          data['avgRating'] ??
+                          0)
+                      .toDouble();
                   final responseRate = ((data['responseRate'] ?? 0).toDouble())
                       .clamp(0, 100);
+                  final swapCredits = (data['swap_credits'] ?? 0) as int;
+                  final swapPoints = (data['swap_points'] ?? 0) as int;
 
                   // Skills stored as arrays on the user doc
                   final skillsToOffer =
@@ -121,7 +135,7 @@ class ProfilePage extends StatelessWidget {
                               children: [
                                 Expanded(
                                   child: _StatCard(
-                                    icon: Icons.verified_user_outlined,
+                                    icon: Icons.swap_horiz_rounded,
                                     label: 'Swaps Completed',
                                     value: swapsCompleted.toString(),
                                   ),
@@ -131,7 +145,7 @@ class ProfilePage extends StatelessWidget {
                                   child: _StatCard(
                                     icon: Icons.access_time,
                                     label: 'Hours Traded',
-                                    value: '${hoursTraded}h',
+                                    value: '${hoursTraded.toStringAsFixed(1)}h',
                                   ),
                                 ),
                                 const SizedBox(width: _gutter),
@@ -145,12 +159,37 @@ class ProfilePage extends StatelessWidget {
                                 const SizedBox(width: _gutter),
                                 Expanded(
                                   child: _StatCard(
+                                    icon: Icons.monetization_on_outlined,
+                                    label: 'Swap Credits',
+                                    value: swapCredits.toString(),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: _gutter),
+                            // Second row of stats
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _StatCard(
+                                    icon: Icons.toll_rounded,
+                                    label: 'Swap Points',
+                                    value: swapPoints.toString(),
+                                  ),
+                                ),
+                                const SizedBox(width: _gutter),
+                                Expanded(
+                                  child: _StatCard(
                                     icon: Icons.trending_up_rounded,
                                     label: 'Response Rate',
                                     value:
                                         '${responseRate.toStringAsFixed(0)}%',
                                   ),
                                 ),
+                                const SizedBox(width: _gutter),
+                                const Expanded(child: SizedBox()),
+                                const SizedBox(width: _gutter),
+                                const Expanded(child: SizedBox()),
                               ],
                             ),
 
@@ -164,6 +203,7 @@ class ProfilePage extends StatelessWidget {
                               skillsBuilder: () => _SkillsSection(
                                 skillsToOffer: skillsToOffer,
                                 servicesNeeded: servicesNeeded,
+                                uid: uid,
                                 onPostFirst: () {
                                   Navigator.of(context).push(
                                     MaterialPageRoute(
@@ -172,9 +212,8 @@ class ProfilePage extends StatelessWidget {
                                   );
                                 },
                               ),
-                              reviewsBuilder: () => const _ReviewsPlaceholder(),
-                              activityBuilder: () =>
-                                  const _ActivityPlaceholder(),
+                              reviewsBuilder: () => _ReviewsSection(uid: uid),
+                              activityBuilder: () => _ActivitySection(uid: uid),
                             ),
 
                             if (bio.isNotEmpty) ...[
@@ -646,43 +685,147 @@ class _SegmentedTabsState extends State<_SegmentedTabs> {
   }
 }
 
-class _SkillsSection extends StatelessWidget {
+class _SkillsSection extends StatefulWidget {
   const _SkillsSection({
     required this.skillsToOffer,
     required this.servicesNeeded,
     required this.onPostFirst,
+    required this.uid,
   });
 
   final List<Map<String, dynamic>> skillsToOffer;
   final List<Map<String, dynamic>> servicesNeeded;
   final VoidCallback onPostFirst;
+  final String uid;
+
+  @override
+  State<_SkillsSection> createState() => _SkillsSectionState();
+}
+
+class _SkillsSectionState extends State<_SkillsSection> {
+  List<Map<String, dynamic>> _postedSkills = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPostedSkills();
+  }
+
+  Future<void> _loadPostedSkills() async {
+    debugPrint('Loading posted skills for uid: ${widget.uid}');
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('skills')
+          .where('creatorUid', isEqualTo: widget.uid)
+          .get();
+
+      debugPrint('Found ${snapshot.docs.length} skills for uid: ${widget.uid}');
+
+      if (mounted) {
+        setState(() {
+          _postedSkills = snapshot.docs.map((doc) => doc.data()).toList();
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading posted skills: $e');
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final hasSkills = skillsToOffer.isNotEmpty;
+    final hasProfileSkills = widget.skillsToOffer.isNotEmpty;
+    final hasPostedSkills = _postedSkills.isNotEmpty;
 
-    if (!hasSkills) return _EmptySkills(onPostFirst: onPostFirst);
+    if (!hasProfileSkills && !hasPostedSkills && !_loading) {
+      return _EmptySkills(onPostFirst: widget.onPostFirst);
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _SectionCard(
-          title: 'My Skills',
-          child: Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: skillsToOffer
-                .map(
-                  (e) =>
-                      _chip('${e['name']} • ${e['category']} • ${e['level']}'),
-                )
-                .toList(),
+        // Posted Skills (from skills collection)
+        if (_loading)
+          const Center(child: CircularProgressIndicator())
+        else if (_postedSkills.isNotEmpty) ...[
+          _SectionCard(
+            title: 'Posted Skills (${_postedSkills.length})',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: _postedSkills.map((skill) {
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: HomePage.surfaceAlt,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: HomePage.line),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        skill['title'] ?? 'Untitled',
+                        style: const TextStyle(
+                          color: HomePage.textPrimary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        skill['description'] ?? '',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: HomePage.textMuted,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          _smallChip(skill['category'] ?? 'other'),
+                          _smallChip(skill['difficulty'] ?? ''),
+                          _smallChip('${skill['estimatedHours'] ?? 1}h'),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
           ),
-        ),
-        const SizedBox(height: 12),
+          const SizedBox(height: 12),
+        ],
+
+        // Profile Skills (from onboarding)
+        if (widget.skillsToOffer.isNotEmpty) ...[
+          _SectionCard(
+            title: 'Skills I Offer',
+            child: Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: widget.skillsToOffer
+                  .map(
+                    (e) =>
+                        _chip('${e['name']} • ${e['category']} • ${e['level']}'),
+                  )
+                  .toList(),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+
+        // Services Needed
         _SectionCard(
           title: 'Services I Need',
-          child: servicesNeeded.isEmpty
+          child: widget.servicesNeeded.isEmpty
               ? const Text(
                   'Nothing added yet.',
                   style: TextStyle(color: HomePage.textMuted),
@@ -690,7 +833,7 @@ class _SkillsSection extends StatelessWidget {
               : Wrap(
                   spacing: 10,
                   runSpacing: 10,
-                  children: servicesNeeded
+                  children: widget.servicesNeeded
                       .map(
                         (e) => _chip(
                           '${e['name']} • ${e['category']} • ${e['level']}',
@@ -712,6 +855,22 @@ class _SkillsSection extends StatelessWidget {
       ),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Text(text, style: const TextStyle(color: HomePage.textPrimary)),
+    );
+  }
+
+  static Widget _smallChip(String text) {
+    if (text.isEmpty) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: HomePage.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: HomePage.line),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(color: HomePage.textMuted, fontSize: 11),
+      ),
     );
   }
 }
@@ -888,31 +1047,368 @@ class _EmptySkills extends StatelessWidget {
   }
 }
 
-class _ReviewsPlaceholder extends StatelessWidget {
-  const _ReviewsPlaceholder();
+class _ReviewsSection extends StatefulWidget {
+  const _ReviewsSection({required this.uid});
+  final String uid;
+
+  @override
+  State<_ReviewsSection> createState() => _ReviewsSectionState();
+}
+
+class _ReviewsSectionState extends State<_ReviewsSection> {
+  final _reviewService = ReviewService();
+  List<Review>? _reviews;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadReviews();
+  }
+
+  Future<void> _loadReviews() async {
+    try {
+      final response = await _reviewService.getUserReviews(widget.uid, limit: 10);
+      if (mounted) {
+        setState(() {
+          _reviews = response.reviews;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return _SectionCard(
-      title: 'Reviews',
-      child: const Text(
-        'No reviews yet.',
-        style: TextStyle(color: HomePage.textMuted),
+    if (_loading) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(20),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (_error != null) {
+      return _SectionCard(
+        title: 'Reviews',
+        child: Text(
+          'Unable to load reviews.',
+          style: const TextStyle(color: HomePage.textMuted),
+        ),
+      );
+    }
+
+    if (_reviews == null || _reviews!.isEmpty) {
+      return _SectionCard(
+        title: 'Reviews',
+        child: const Text(
+          'No reviews yet.',
+          style: TextStyle(color: HomePage.textMuted),
+        ),
+      );
+    }
+
+    return Column(
+      children: _reviews!.map((review) => _ReviewCard(review: review)).toList(),
+    );
+  }
+}
+
+class _ReviewCard extends StatelessWidget {
+  const _ReviewCard({required this.review});
+  final Review review;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      color: HomePage.surface,
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: HomePage.line),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 20,
+                  backgroundColor: HomePage.surfaceAlt,
+                  backgroundImage: review.reviewerPhoto != null
+                      ? NetworkImage(review.reviewerPhoto!)
+                      : null,
+                  child: review.reviewerPhoto == null
+                      ? Text(
+                          (review.reviewerName ?? 'U')[0].toUpperCase(),
+                          style: const TextStyle(
+                            color: HomePage.textPrimary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        )
+                      : null,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        review.reviewerName ?? 'Anonymous',
+                        style: const TextStyle(
+                          color: HomePage.textPrimary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (review.skillExchanged != null)
+                        Text(
+                          review.skillExchanged!,
+                          style: const TextStyle(
+                            color: HomePage.textMuted,
+                            fontSize: 13,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Row(
+                  children: List.generate(
+                    5,
+                    (i) => Icon(
+                      i < review.rating ? Icons.star : Icons.star_border,
+                      size: 18,
+                      color: const Color(0xFFF59E0B),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (review.reviewText != null && review.reviewText!.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Text(
+                review.reviewText!,
+                style: const TextStyle(color: HomePage.textPrimary),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
 }
 
-class _ActivityPlaceholder extends StatelessWidget {
-  const _ActivityPlaceholder();
+class _ActivitySection extends StatefulWidget {
+  const _ActivitySection({required this.uid});
+  final String uid;
+
+  @override
+  State<_ActivitySection> createState() => _ActivitySectionState();
+}
+
+class _ActivitySectionState extends State<_ActivitySection> {
+  final _portfolioService = PortfolioService();
+  List<CompletedSwapSummary>? _swaps;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadActivity();
+  }
+
+  Future<void> _loadActivity() async {
+    try {
+      final portfolio = await _portfolioService.getPortfolio(
+        widget.uid,
+        includeSwaps: true,
+        includeReviews: false,
+        swapLimit: 10,
+      );
+      if (mounted) {
+        setState(() {
+          _swaps = portfolio.recentSwaps;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return _SectionCard(
-      title: 'Recent Activity',
-      child: const Text(
-        'No recent activity.',
-        style: TextStyle(color: HomePage.textMuted),
+    if (_loading) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(20),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (_error != null) {
+      return _SectionCard(
+        title: 'Recent Activity',
+        child: Text(
+          'Unable to load activity.',
+          style: const TextStyle(color: HomePage.textMuted),
+        ),
+      );
+    }
+
+    if (_swaps == null || _swaps!.isEmpty) {
+      return _SectionCard(
+        title: 'Recent Activity',
+        child: const Text(
+          'No recent activity.',
+          style: TextStyle(color: HomePage.textMuted),
+        ),
+      );
+    }
+
+    return Column(
+      children: _swaps!.map((swap) => _ActivityCard(swap: swap)).toList(),
+    );
+  }
+}
+
+class _ActivityCard extends StatelessWidget {
+  const _ActivityCard({required this.swap});
+  final CompletedSwapSummary swap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      color: HomePage.surface,
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: HomePage.line),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 20,
+                  backgroundColor: HomePage.surfaceAlt,
+                  backgroundImage: swap.partnerPhoto != null
+                      ? NetworkImage(swap.partnerPhoto!)
+                      : null,
+                  child: swap.partnerPhoto == null
+                      ? Text(
+                          (swap.partnerName ?? 'U')[0].toUpperCase(),
+                          style: const TextStyle(
+                            color: HomePage.textPrimary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        )
+                      : null,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Swap with ${swap.partnerName ?? "Unknown"}',
+                        style: const TextStyle(
+                          color: HomePage.textPrimary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        '${swap.hoursExchanged.toStringAsFixed(1)} hours exchanged',
+                        style: const TextStyle(
+                          color: HomePage.textMuted,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF22C55E).withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Text(
+                    'Completed',
+                    style: TextStyle(
+                      color: Color(0xFF22C55E),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                if (swap.skillTaught != null) ...[
+                  Expanded(
+                    child: _skillPill(
+                      'Taught: ${swap.skillTaught!}',
+                      const Color(0xFF7C3AED),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                if (swap.skillLearned != null)
+                  Expanded(
+                    child: _skillPill(
+                      'Learned: ${swap.skillLearned!}',
+                      const Color(0xFF0EA5E9),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _skillPill(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+        overflow: TextOverflow.ellipsis,
       ),
     );
   }

@@ -40,6 +40,7 @@ def upsert_profile(profile_data: ProfileCreate):
 
     # Prepare profile data for Firestore
     profile_dict = {
+        "uid": profile_data.uid,  # Store uid in document for easy querying
         "email": profile_data.email,
         "display_name": profile_data.display_name,
         "photo_url": profile_data.photo_url,

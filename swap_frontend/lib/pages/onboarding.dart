@@ -228,7 +228,10 @@ class _ProfileSetupFlowState extends State<ProfileSetupFlow> {
       // Build payload. Because _offer/_need are prefilled from Firestore,
       // they will only be empty if the user intentionally removed them.
       final userData = <String, dynamic>{
+        'uid': user.uid, // Store uid in document for linking skills
+        'email': user.email,
         'fullName': _fullName.text.trim(),
+        'displayName': _fullName.text.trim(), // Also store as displayName
         'username': _username.text.trim(),
         'bio': _bio.text.trim(),
         'city': _city.text.trim(),
@@ -246,6 +249,7 @@ class _ProfileSetupFlowState extends State<ProfileSetupFlow> {
         'dmOpen': _dmOpen,
         'emailUpdates': _emailUpdates,
         'showCity': _showCity,
+        'onboardingComplete': true, // Mark onboarding as done
         if (photoUrl != null) 'photoUrl': photoUrl, // keep existing if null
       };
 

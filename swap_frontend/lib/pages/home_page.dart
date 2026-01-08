@@ -6,6 +6,7 @@ import '../services/search_service.dart';
 import '../services/auth_service.dart';
 import '../widgets/app_sidebar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'user_profile_page.dart';
 // Removed debug-only imports (seed/upsert/test helpers)
 
 class HomePage extends StatefulWidget {
@@ -239,6 +240,8 @@ class _DiscoverPaneState extends State<_DiscoverPane> {
           tags: List<String>.from(data['tags'] ?? []),
           verified: data['verified'] ?? false,
           isNew: data['isNew'] ?? false,
+          creatorUid: data['creatorUid'] ?? '',
+          creatorName: data['creatorName'] ?? 'Anonymous',
         );
       }).toList();
 
@@ -324,101 +327,117 @@ class _DiscoverPaneState extends State<_DiscoverPane> {
                       itemCount: searchResults.length,
                       itemBuilder: (context, i) {
                         final r = searchResults[i];
-                        return Card(
-                          color: HomePage.surface,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            side: BorderSide(color: HomePage.line),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(14),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Wrap(
-                                  spacing: 8,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: HomePage.surfaceAlt,
-                                        borderRadius: BorderRadius.circular(
-                                          999,
-                                        ),
-                                        border: Border.all(
-                                          color: HomePage.line,
-                                        ),
-                                      ),
-                                      child: Text(
-                                        'profile',
-                                        style: TextStyle(
-                                          color: HomePage.textMuted,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  r.displayName.isNotEmpty
+                        return InkWell(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => UserProfilePage(
+                                  uid: r.uid,
+                                  initialName: r.displayName.isNotEmpty
                                       ? r.displayName
                                       : r.email,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: HomePage.textPrimary,
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 16,
-                                  ),
                                 ),
-                                const SizedBox(height: 6),
-                                Expanded(
-                                  child: Text(
-                                    r.bio,
-                                    maxLines: 3,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(color: HomePage.textMuted),
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        r.skillsToOffer,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: HomePage.textMuted,
-                                          fontSize: 12,
+                              ),
+                            );
+                          },
+                          borderRadius: BorderRadius.circular(14),
+                          child: Card(
+                            color: HomePage.surface,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              side: BorderSide(color: HomePage.line),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(14),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Wrap(
+                                    spacing: 8,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 4,
                                         ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(
-                                          Icons.star,
-                                          color: Colors.amber,
-                                          size: 18,
-                                        ),
-                                        Text(
-                                          r.score.toStringAsFixed(2),
-                                          style: TextStyle(
-                                            color: HomePage.textPrimary,
-                                            fontWeight: FontWeight.w700,
+                                        decoration: BoxDecoration(
+                                          color: HomePage.surfaceAlt,
+                                          borderRadius: BorderRadius.circular(
+                                            999,
+                                          ),
+                                          border: Border.all(
+                                            color: HomePage.line,
                                           ),
                                         ),
-                                      ],
+                                        child: Text(
+                                          'profile',
+                                          style: TextStyle(
+                                            color: HomePage.textMuted,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    r.displayName.isNotEmpty
+                                        ? r.displayName
+                                        : r.email,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: HomePage.textPrimary,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 16,
                                     ),
-                                  ],
-                                ),
-                              ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Expanded(
+                                    child: Text(
+                                      r.bio,
+                                      maxLines: 3,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(color: HomePage.textMuted),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          r.skillsToOffer,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: HomePage.textMuted,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(
+                                            Icons.star,
+                                            color: Colors.amber,
+                                            size: 18,
+                                          ),
+                                          Text(
+                                            r.score.toStringAsFixed(2),
+                                            style: TextStyle(
+                                              color: HomePage.textPrimary,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         );
@@ -634,38 +653,53 @@ class _SkillCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 0,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // top badges row
-            Row(
-              children: [
-                _Pill(skill.category),
-                const SizedBox(width: 8),
-                if (skill.verified)
-                  const _Pill(
-                    'Verified',
-                    icon: Icons.verified,
-                    color: HomePage.success,
-                  ),
-                if (skill.isNew) ...[
-                  const SizedBox(width: 6),
-                  const _Pill('New', color: HomePage.warning),
-                ],
-                const Spacer(),
-                IconButton(
-                  onPressed: () {},
-                  icon: const Icon(Icons.favorite_border, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  splashRadius: 18,
-                ),
-              ],
+    return InkWell(
+      onTap: () {
+        if (skill.creatorUid.isNotEmpty) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => UserProfilePage(
+                uid: skill.creatorUid,
+                initialName: skill.creatorName,
+              ),
             ),
+          );
+        }
+      },
+      borderRadius: BorderRadius.circular(14),
+      child: Card(
+        elevation: 0,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // top badges row
+              Row(
+                children: [
+                  _Pill(skill.category),
+                  const SizedBox(width: 8),
+                  if (skill.verified)
+                    const _Pill(
+                      'Verified',
+                      icon: Icons.verified,
+                      color: HomePage.success,
+                    ),
+                  if (skill.isNew) ...[
+                    const SizedBox(width: 6),
+                    const _Pill('New', color: HomePage.warning),
+                  ],
+                  const Spacer(),
+                  IconButton(
+                    onPressed: () {},
+                    icon: const Icon(Icons.favorite_border, size: 20),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    splashRadius: 18,
+                  ),
+                ],
+              ),
             const SizedBox(height: 10),
             Text(
               skill.title,
@@ -718,7 +752,19 @@ class _SkillCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
+
+            // Creator name
+            if (skill.creatorName.isNotEmpty)
+              Text(
+                'By ${skill.creatorName}',
+                style: const TextStyle(
+                  color: HomePage.accentAlt,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            const SizedBox(height: 8),
 
             // tags + button: use a Row so the button can align to the right reliably.
             Row(
@@ -773,6 +819,7 @@ class _SkillCard extends StatelessWidget {
           ],
         ),
       ),
+      ),
     );
   }
 }
@@ -826,6 +873,8 @@ class _Skill {
   final List<String> tags;
   final bool verified;
   final bool isNew;
+  final String creatorUid; // Link to profile
+  final String creatorName;
 
   _Skill({
     required this.title,
@@ -837,6 +886,8 @@ class _Skill {
     required this.tags,
     this.verified = false,
     this.isNew = false,
+    this.creatorUid = '',
+    this.creatorName = '',
   });
 }
 
