@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Script to reindex all profiles from Firestore to Qdrant."""
+"""Script to reindex all profiles from Firestore to Azure AI Search."""
 
 import sys
 from pathlib import Path
@@ -9,14 +9,14 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.firebase_db import get_firebase_service
 from app.embeddings import get_embedding_service
-from app.qdrant_client import get_qdrant_service
+from app.azure_search import get_azure_search_service
 
 
 def reindex_all_profiles():
-    """Reindex all profiles from Firestore to Qdrant."""
+    """Reindex all profiles from Firestore to Azure AI Search."""
     firebase_service = get_firebase_service()
     embedding_service = get_embedding_service()
-    qdrant_service = get_qdrant_service()
+    azure_search_service = get_azure_search_service()
     
     profiles = firebase_service.list_profiles(limit=10000)
     print(f"Found {len(profiles)} profiles to reindex")
@@ -59,8 +59,8 @@ def reindex_all_profiles():
                 "show_city": profile.get('show_city', True),
             }
             
-            # Upsert to Qdrant (use uid as point ID)
-            qdrant_service.upsert_profile(
+            # Upsert to Azure AI Search
+            azure_search_service.upsert_profile(
                 username=uid,
                 offer_vec=offer_vec,
                 need_vec=need_vec,
