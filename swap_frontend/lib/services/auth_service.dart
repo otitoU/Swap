@@ -83,7 +83,7 @@ class AuthService {
   }
 
   Future<void> _ensureUserDoc(User user) async {
-    final ref = _db.collection('users').doc(user.uid);
+    final ref = _db.collection('profiles').doc(user.uid);
     final snap = await ref.get();
     if (!snap.exists) {
       await ref.set({

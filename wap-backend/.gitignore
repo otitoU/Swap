@@ -29,10 +29,21 @@ wheels/
 htmlcov/
 .tox/
 
-# Environment
+# Environment & Secrets
 .env
 .env.local
 .env.*
+*.env
+
+# Firebase credentials
+firebase-credentials.json
+*-credentials.json
+serviceAccount*.json
+
+# API keys / secrets
+*.pem
+*.key
+secrets/
 
 # IDE
 .vscode/

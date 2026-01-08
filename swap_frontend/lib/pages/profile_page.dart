@@ -28,7 +28,7 @@ class ProfilePage extends StatelessWidget {
             Expanded(
               child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
                 stream: FirebaseFirestore.instance
-                    .collection('users')
+                    .collection('profiles')
                     .doc(uid)
                     .snapshots(),
                 builder: (context, snap) {

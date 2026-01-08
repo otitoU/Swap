@@ -97,7 +97,7 @@ class _ProfileSetupFlowState extends State<ProfileSetupFlow> {
 
       // Get user data from Firestore
       final doc = await FirebaseFirestore.instance
-          .collection('users')
+          .collection('profiles')
           .doc(user.uid)
           .get();
 
@@ -250,7 +250,7 @@ class _ProfileSetupFlowState extends State<ProfileSetupFlow> {
       };
 
       await FirebaseFirestore.instance
-          .collection('users')
+          .collection('profiles')
           .doc(user.uid)
           .set(userData, SetOptions(merge: true));
 
