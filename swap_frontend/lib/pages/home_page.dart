@@ -244,6 +244,7 @@ class _DiscoverPaneState extends State<_DiscoverPane> {
           isNew: data['isNew'] ?? false,
           creatorUid: data['creatorUid'] ?? '',
           creatorName: data['creatorName'] ?? 'Anonymous',
+          creatorPhotoUrl: data['creatorPhotoUrl'] as String?,
         );
       }).toList();
 
@@ -360,46 +361,69 @@ class _DiscoverPaneState extends State<_DiscoverPane> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Wrap(
-                                    spacing: 8,
+                                  Row(
                                     children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 4,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: HomePage.surfaceAlt,
-                                          borderRadius: BorderRadius.circular(
-                                            999,
-                                          ),
-                                          border: Border.all(
-                                            color: HomePage.line,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          'profile',
-                                          style: TextStyle(
-                                            color: HomePage.textMuted,
-                                            fontSize: 12,
-                                          ),
+                                      // Profile picture
+                                      CircleAvatar(
+                                        radius: 20,
+                                        backgroundColor: HomePage.surfaceAlt,
+                                        backgroundImage: r.photoUrl != null && r.photoUrl!.isNotEmpty
+                                            ? NetworkImage(r.photoUrl!)
+                                            : null,
+                                        child: r.photoUrl == null || r.photoUrl!.isEmpty
+                                            ? Text(
+                                                (r.displayName.isNotEmpty ? r.displayName : r.email)
+                                                    .characters.first.toUpperCase(),
+                                                style: const TextStyle(
+                                                  color: HomePage.textMuted,
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              )
+                                            : null,
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              r.displayName.isNotEmpty
+                                                  ? r.displayName
+                                                  : r.email,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                color: HomePage.textPrimary,
+                                                fontWeight: FontWeight.w800,
+                                                fontSize: 15,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(
+                                                horizontal: 6,
+                                                vertical: 2,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: HomePage.surfaceAlt,
+                                                borderRadius: BorderRadius.circular(999),
+                                                border: Border.all(color: HomePage.line),
+                                              ),
+                                              child: const Text(
+                                                'profile',
+                                                style: TextStyle(
+                                                  color: HomePage.textMuted,
+                                                  fontSize: 10,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    r.displayName.isNotEmpty
-                                        ? r.displayName
-                                        : r.email,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: HomePage.textPrimary,
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 16,
-                                    ),
-                                  ),
+                                  const SizedBox(height: 10),
                                   const SizedBox(height: 6),
                                   Expanded(
                                     child: Text(
@@ -761,15 +785,42 @@ class _SkillCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
 
-            // Creator name
+            // Creator row with avatar
             if (skill.creatorName.isNotEmpty)
-              Text(
-                'By ${skill.creatorName}',
-                style: const TextStyle(
-                  color: HomePage.accentAlt,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 12,
+                    backgroundColor: HomePage.surface,
+                    backgroundImage: skill.creatorPhotoUrl != null && skill.creatorPhotoUrl!.isNotEmpty
+                        ? NetworkImage(skill.creatorPhotoUrl!)
+                        : null,
+                    child: skill.creatorPhotoUrl == null || skill.creatorPhotoUrl!.isEmpty
+                        ? Text(
+                            skill.creatorName.isNotEmpty 
+                                ? skill.creatorName[0].toUpperCase() 
+                                : 'U',
+                            style: const TextStyle(
+                              color: HomePage.textMuted,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          )
+                        : null,
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      skill.creatorName,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: HomePage.accentAlt,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             const SizedBox(height: 8),
 
@@ -891,6 +942,7 @@ class _Skill {
   final bool isNew;
   final String creatorUid; // Link to profile
   final String creatorName;
+  final String? creatorPhotoUrl; // Creator's profile picture
 
   _Skill({
     required this.title,
@@ -904,6 +956,7 @@ class _Skill {
     this.isNew = false,
     this.creatorUid = '',
     this.creatorName = '',
+    this.creatorPhotoUrl,
   });
 }
 

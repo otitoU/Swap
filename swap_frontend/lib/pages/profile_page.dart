@@ -1373,7 +1373,7 @@ class _ActivityCard extends StatelessWidget {
                 if (swap.skillTaught != null) ...[
                   Expanded(
                     child: _skillPill(
-                      'Taught: ${swap.skillTaught!}',
+                      'Offered: ${swap.skillTaught!}',
                       const Color(0xFF7C3AED),
                     ),
                   ),
@@ -1382,7 +1382,7 @@ class _ActivityCard extends StatelessWidget {
                 if (swap.skillLearned != null)
                   Expanded(
                     child: _skillPill(
-                      'Learned: ${swap.skillLearned!}',
+                      'Received: ${swap.skillLearned!}',
                       const Color(0xFF0EA5E9),
                     ),
                   ),

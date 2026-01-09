@@ -76,8 +76,7 @@ class UserProfilePage extends StatelessWidget {
           final swapsCompleted = (data['completed_swap_count'] ??
               data['swapsCompleted'] ??
               0) as int;
-          final avgRating =
-              (data['average_rating'] ?? data['avgRating'] ?? 0).toDouble();
+          final swapCredits = (data['swap_credits'] ?? 0) as int;
 
           // Skills
           final skillsToOffer =
@@ -326,9 +325,9 @@ class UserProfilePage extends StatelessWidget {
                         const SizedBox(width: 12),
                         Expanded(
                           child: _statCard(
-                            Icons.star,
-                            'Rating',
-                            avgRating > 0 ? avgRating.toStringAsFixed(1) : 'N/A',
+                            Icons.monetization_on_outlined,
+                            'Credits',
+                            swapCredits.toString(),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -391,6 +390,11 @@ class UserProfilePage extends StatelessWidget {
                               .toList(),
                         ),
                       ),
+
+                    const SizedBox(height: 16),
+
+                    // Swap History
+                    _SwapHistorySection(uid: uid),
                   ],
                 ),
               ),
@@ -1157,6 +1161,281 @@ class _SwapTypeOption extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _SwapHistorySection extends StatefulWidget {
+  const _SwapHistorySection({required this.uid});
+  final String uid;
+
+  @override
+  State<_SwapHistorySection> createState() => _SwapHistorySectionState();
+}
+
+class _SwapHistorySectionState extends State<_SwapHistorySection> {
+  final _swapService = SwapRequestService();
+  List<SwapRequest>? _swaps;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSwapHistory();
+  }
+
+  Future<void> _loadSwapHistory() async {
+    try {
+      final swaps = await _swapService.getCompletedSwaps(widget.uid, limit: 10);
+      if (mounted) {
+        setState(() {
+          _swaps = swaps;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading swap history: $e');
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return Card(
+        color: HomePage.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: HomePage.line),
+        ),
+        child: const Padding(
+          padding: EdgeInsets.all(20),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
+
+    if (_error != null) {
+      return Card(
+        color: HomePage.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: HomePage.line),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Swap History',
+                style: TextStyle(
+                  color: HomePage.textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Unable to load swap history.',
+                style: TextStyle(color: HomePage.textMuted),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_swaps == null || _swaps!.isEmpty) {
+      return Card(
+        color: HomePage.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: HomePage.line),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Swap History',
+                style: TextStyle(
+                  color: HomePage.textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'No completed swaps yet.',
+                style: TextStyle(color: HomePage.textMuted),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Card(
+      color: HomePage.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: HomePage.line),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Swap History',
+              style: TextStyle(
+                color: HomePage.textPrimary,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 12),
+            ..._swaps!.map((swap) => _SwapRequestHistoryCard(swap: swap, viewerUid: widget.uid)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SwapRequestHistoryCard extends StatelessWidget {
+  const _SwapRequestHistoryCard({required this.swap, required this.viewerUid});
+  final SwapRequest swap;
+  final String viewerUid;
+
+  @override
+  Widget build(BuildContext context) {
+    // Determine if this user is the requester or recipient
+    final isRequester = swap.requesterUid == viewerUid;
+    final partnerName = isRequester
+        ? swap.recipientProfile?.displayName
+        : swap.requesterProfile?.displayName;
+    final partnerPhoto = isRequester
+        ? swap.recipientProfile?.photoUrl
+        : swap.requesterProfile?.photoUrl;
+
+    // What the viewer taught vs learned
+    final skillTaught = isRequester ? swap.requesterOffer : swap.requesterNeed;
+    final skillLearned = isRequester ? swap.requesterNeed : swap.requesterOffer;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: HomePage.surfaceAlt,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: HomePage.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: HomePage.surface,
+                backgroundImage: partnerPhoto != null
+                    ? NetworkImage(partnerPhoto)
+                    : null,
+                child: partnerPhoto == null
+                    ? Text(
+                        (partnerName ?? 'U')[0].toUpperCase(),
+                        style: const TextStyle(
+                          color: HomePage.textPrimary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Swap with ${partnerName ?? "Unknown"}',
+                      style: const TextStyle(
+                        color: HomePage.textPrimary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                    if (swap.completion?.finalHours != null)
+                      Text(
+                        '${swap.completion!.finalHours!.toStringAsFixed(1)} hours',
+                        style: TextStyle(
+                          color: HomePage.textMuted,
+                          fontSize: 12,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF22C55E).withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'Completed',
+                  style: TextStyle(
+                    color: Color(0xFF22C55E),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (skillTaught != null || skillLearned != null) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                if (skillTaught != null && skillTaught.isNotEmpty)
+                  _skillPill('Offered: $skillTaught', const Color(0xFF7C3AED)),
+                if (skillLearned != null && skillLearned.isNotEmpty)
+                  _skillPill('Received: $skillLearned', const Color(0xFF0EA5E9)),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _skillPill(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+        ),
+        overflow: TextOverflow.ellipsis,
       ),
     );
   }

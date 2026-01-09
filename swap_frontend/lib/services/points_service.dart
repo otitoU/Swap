@@ -4,13 +4,14 @@ import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 
+import '../config/app_config.dart';
 import '../models/points.dart';
 
 /// Service for points API calls.
 class PointsService {
   final String baseUrl;
 
-  PointsService({String? baseUrl}) : baseUrl = baseUrl ?? 'http://localhost:8000';
+  PointsService({String? baseUrl}) : baseUrl = baseUrl ?? AppConfig.apiBaseUrl;
 
   /// Get authorization headers if user is signed in.
   Future<Map<String, String>> _getHeaders() async {

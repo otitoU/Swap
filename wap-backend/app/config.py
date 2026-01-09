@@ -23,8 +23,8 @@ class Settings(BaseSettings):
     azure_search_api_key: Optional[str] = None
     azure_search_index: str = "swap-users"
     
-    # Redis Cache (optional - disabled in production by default)
-    redis_enabled: bool = True  # Set to False to disable caching
+    # Redis Cache (optional - disabled for serverless deployment)
+    redis_enabled: bool = False  # Set to True for local dev with Redis
     redis_host: str = "localhost"
     redis_port: int = 6379
     redis_ttl: int = 3600  # Cache TTL in seconds (1 hour)

@@ -27,15 +27,35 @@ router = APIRouter(prefix="/swaps", tags=["swap-completion"])
 AUTO_COMPLETE_HOURS = 48
 
 
+def _get_participant_profile_dict(uid: str) -> dict:
+    """Get minimal profile info for a swap participant as a dict."""
+    firebase = get_firebase_service()
+    profile = firebase.get_profile(uid)
+    if not profile:
+        return None
+    return {
+        "uid": profile.get("uid", uid),
+        "display_name": profile.get("display_name"),
+        "photo_url": profile.get("photo_url"),
+        "email": profile.get("email"),
+        "skills_to_offer": profile.get("skills_to_offer"),
+        "services_needed": profile.get("services_needed"),
+    }
+
+
 def _convert_timestamps(data: dict) -> dict:
-    """Convert Firestore timestamps to datetime objects or ISO strings."""
+    """Convert Firestore timestamps to ISO strings recursively."""
     timestamp_fields = ["created_at", "updated_at", "responded_at", "auto_complete_at", "completed_at", "marked_at"]
-    for field in timestamp_fields:
-        if field in data and data[field]:
-            if hasattr(data[field], "isoformat"):
-                data[field] = data[field].isoformat() if isinstance(data[field], datetime) else data[field]
-            elif hasattr(data[field], "__str__"):
-                data[field] = str(data[field])
+
+    for key, value in data.items():
+        if isinstance(value, dict):
+            data[key] = _convert_timestamps(value)
+        elif key in timestamp_fields and value:
+            if hasattr(value, "isoformat"):
+                data[key] = value.isoformat()
+            elif hasattr(value, "__str__"):
+                data[key] = str(value)
+
     return data
 
 
@@ -451,7 +471,7 @@ def get_completion_status(
     return _get_completion_status(swap_data)
 
 
-@router.get("/completed", response_model=list)
+@router.get("/completed")
 def get_completed_swaps(
     uid: str = Query(..., description="UID of the user"),
     limit: int = Query(20, ge=1, le=100),
@@ -482,19 +502,31 @@ def get_completed_swaps(
     # Combine and sort
     all_swaps = []
 
+    # Cache profiles to avoid duplicate fetches
+    profile_cache = {}
+
+    def get_cached_profile(user_uid: str):
+        if user_uid not in profile_cache:
+            profile_cache[user_uid] = _get_participant_profile_dict(user_uid)
+        return profile_cache[user_uid]
+
     for doc in requester_swaps:
         data = doc.to_dict()
         data["id"] = doc.id
         data = _convert_timestamps(data)
+        data["requester_profile"] = get_cached_profile(data.get("requester_uid"))
+        data["recipient_profile"] = get_cached_profile(data.get("recipient_uid"))
         all_swaps.append(data)
 
     for doc in recipient_swaps:
         data = doc.to_dict()
         data["id"] = doc.id
         data = _convert_timestamps(data)
+        data["requester_profile"] = get_cached_profile(data.get("requester_uid"))
+        data["recipient_profile"] = get_cached_profile(data.get("recipient_uid"))
         all_swaps.append(data)
 
     # Sort by updated_at descending and limit
     all_swaps.sort(key=lambda x: x.get("updated_at", ""), reverse=True)
 
-    return all_swaps[:limit]
+    return {"completed_swaps": all_swaps[:limit]}

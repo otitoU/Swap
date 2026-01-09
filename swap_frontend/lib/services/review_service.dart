@@ -4,13 +4,14 @@ import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 
+import '../config/app_config.dart';
 import '../models/review.dart';
 
 /// Service for review API calls.
 class ReviewService {
   final String baseUrl;
 
-  ReviewService({String? baseUrl}) : baseUrl = baseUrl ?? 'http://localhost:8000';
+  ReviewService({String? baseUrl}) : baseUrl = baseUrl ?? AppConfig.apiBaseUrl;
 
   /// Get authorization headers if user is signed in.
   Future<Map<String, String>> _getHeaders() async {

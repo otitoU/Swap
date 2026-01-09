@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 
+import '../config/app_config.dart';
 import '../models/conversation.dart';
 
 /// Service for messaging API calls.
@@ -11,7 +12,7 @@ class MessagingService {
   final String baseUrl;
 
   MessagingService({String? baseUrl})
-      : baseUrl = baseUrl ?? 'http://localhost:8000';
+      : baseUrl = baseUrl ?? AppConfig.apiBaseUrl;
 
   /// Get authorization headers if user is signed in.
   Future<Map<String, String>> _getHeaders() async {

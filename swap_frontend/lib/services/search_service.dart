@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 
+import '../config/app_config.dart';
+
 /// Model for a single search hit returned by the backend /search endpoint.
 class SearchResult {
   final String uid;
@@ -14,6 +16,7 @@ class SearchResult {
   final String bio;
   final String city;
   final double score;
+  final String? photoUrl;
 
   SearchResult({
     required this.uid,
@@ -24,6 +27,7 @@ class SearchResult {
     required this.bio,
     required this.city,
     required this.score,
+    this.photoUrl,
   });
 
   factory SearchResult.fromJson(Map<String, dynamic> j) => SearchResult(
@@ -43,6 +47,7 @@ class SearchResult {
     score: (j['score'] is num)
         ? (j['score'] as num).toDouble()
         : double.tryParse('${j['score']}') ?? 0.0,
+    photoUrl: j['photo_url'] as String? ?? j['photoUrl'] as String?,
   );
 }
 
@@ -53,7 +58,7 @@ class SearchService {
   final String baseUrl;
 
   SearchService({String? baseUrl})
-    : baseUrl = baseUrl ?? 'http://localhost:8000';
+    : baseUrl = baseUrl ?? AppConfig.apiBaseUrl;
 
   /// Perform a semantic search.
   ///

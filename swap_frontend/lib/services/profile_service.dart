@@ -4,10 +4,12 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 
+import '../config/app_config.dart';
+
 class ProfileService {
   final String baseUrl;
   ProfileService({String? baseUrl})
-    : baseUrl = baseUrl ?? 'http://localhost:8000';
+    : baseUrl = baseUrl ?? AppConfig.apiBaseUrl;
 
   Future<void> upsertProfile({
     required String uid,

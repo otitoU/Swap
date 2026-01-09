@@ -57,6 +57,9 @@ class _ProfileSetupFlowState extends State<ProfileSetupFlow> {
   bool _emailUpdates = true;
   bool _showCity = false;
 
+  // Submission state
+  bool _submitting = false;
+
   // sample options
   static const _skillCategories = <String>[
     'Engineering',
@@ -209,12 +212,16 @@ class _ProfileSetupFlowState extends State<ProfileSetupFlow> {
   }
 
   Future<void> _submit() async {
+    if (_submitting) return; // Prevent double submission
+    setState(() => _submitting = true);
+
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Error: No user is signed in')),
         );
+        setState(() => _submitting = false);
         return;
       }
 
@@ -222,14 +229,43 @@ class _ProfileSetupFlowState extends State<ProfileSetupFlow> {
       String? photoUrl;
       if (_avatarBytes != null) {
         try {
+          debugPrint('Starting avatar upload (${_avatarBytes!.length} bytes)...');
           final ref = FirebaseStorage.instance
               .ref()
               .child('user_avatars')
               .child('${user.uid}.jpg');
-          await ref.putData(_avatarBytes!, SettableMetadata(contentType: 'image/jpeg'));
+
+          // Add timeout to prevent hanging forever
+          final uploadTask = ref.putData(
+            _avatarBytes!,
+            SettableMetadata(contentType: 'image/jpeg'),
+          );
+
+          await uploadTask.timeout(
+            const Duration(seconds: 30),
+            onTimeout: () {
+              debugPrint('Avatar upload timed out after 30 seconds');
+              throw TimeoutException('Avatar upload timed out');
+            },
+          );
+
+          debugPrint('Upload complete, getting download URL...');
           photoUrl = await ref.getDownloadURL();
+          debugPrint('Avatar URL: $photoUrl');
+        } on TimeoutException {
+          debugPrint('Avatar upload timed out - continuing without avatar');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Photo upload timed out. Profile saved without photo.')),
+            );
+          }
         } catch (e) {
           debugPrint('Error uploading avatar: $e');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Photo upload failed: $e')),
+            );
+          }
         }
       }
 
@@ -319,6 +355,7 @@ class _ProfileSetupFlowState extends State<ProfileSetupFlow> {
     } catch (e, stackTrace) {
       debugPrint('Error in _submit: $e\n$stackTrace');
       if (!mounted) return;
+      setState(() => _submitting = false);
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Error updating profile: $e')));
@@ -520,18 +557,29 @@ class _ProfileSetupFlowState extends State<ProfileSetupFlow> {
                     child: Row(
                       children: [
                         OutlinedButton.icon(
-                          onPressed: _back,
+                          onPressed: _submitting ? null : _back,
                           icon: const Icon(Icons.arrow_back),
                           label: const Text('Back'),
                         ),
                         const Spacer(),
                         FilledButton.icon(
-                          onPressed: _next,
-                          icon: Icon(
-                            _step < 3 ? Icons.arrow_forward : Icons.check,
-                          ),
+                          onPressed: _submitting ? null : _next,
+                          icon: _submitting
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : Icon(
+                                  _step < 3 ? Icons.arrow_forward : Icons.check,
+                                ),
                           label: Text(
-                            _step < 3 ? 'Continue' : 'Complete Setup',
+                            _submitting
+                                ? 'Saving...'
+                                : (_step < 3 ? 'Continue' : 'Complete Setup'),
                           ),
                         ),
                       ],

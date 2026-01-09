@@ -3,7 +3,7 @@
 from datetime import datetime
 from enum import Enum
 from typing import Optional, List, Literal
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field
 
 
 class ProfileBase(BaseModel):
@@ -11,7 +11,7 @@ class ProfileBase(BaseModel):
     
     # Firebase Auth fields
     uid: str = Field(..., description="Firebase Auth UID")
-    email: EmailStr = Field(..., description="User email")
+    email: str = Field(..., description="User email")
     display_name: Optional[str] = Field(None, description="Display name")
     photo_url: Optional[str] = Field(None, description="Profile photo URL")
     
@@ -41,7 +41,7 @@ class ProfileCreate(ProfileBase):
 class ProfileUpdate(BaseModel):
     """Schema for updating an existing profile (all fields optional)."""
     
-    email: Optional[EmailStr] = None
+    email: Optional[str] = None
     display_name: Optional[str] = None
     photo_url: Optional[str] = None
     full_name: Optional[str] = None

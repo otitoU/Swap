@@ -5,8 +5,9 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'home_page.dart';
 import '../widgets/app_sidebar.dart';
+import '../config/app_config.dart';
 
-const String _apiBaseUrl = 'http://localhost:8000';
+final String _apiBaseUrl = AppConfig.apiBaseUrl;
 
 // Color palette used throughout the page
 const Color backgroundColor = Color(0xFF0F0F11);
@@ -111,6 +112,23 @@ class _PostSkillPageState extends State<PostSkillPage> {
     );
 
     try {
+      // Fetch user's profile photo from Firestore profile
+      String? creatorPhotoUrl = user.photoURL;
+      try {
+        final profileDoc = await FirebaseFirestore.instance
+            .collection('profiles')
+            .doc(user.uid)
+            .get();
+        if (profileDoc.exists) {
+          final profileData = profileDoc.data();
+          if (profileData != null && profileData['photoUrl'] != null) {
+            creatorPhotoUrl = profileData['photoUrl'] as String;
+          }
+        }
+      } catch (e) {
+        debugPrint('Could not fetch profile photo: $e');
+      }
+
       // Create skill document
       final skillData = {
         'title': _titleController.text.trim(),
@@ -124,6 +142,7 @@ class _PostSkillPageState extends State<PostSkillPage> {
         'creatorUid': user.uid,
         'creatorEmail': user.email ?? '',
         'creatorName': user.displayName ?? user.email ?? 'Anonymous',
+        'creatorPhotoUrl': creatorPhotoUrl, // Save creator's profile picture
         'createdAt': FieldValue.serverTimestamp(),
         'rating': 4.5, // Default rating for new skills
         'verified': false, // Can be set to true by admin later

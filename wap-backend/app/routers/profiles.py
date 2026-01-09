@@ -17,12 +17,12 @@ router = APIRouter(prefix="/profiles", tags=["profiles"])
 @router.post("/upsert", response_model=ProfileResponse)
 def upsert_profile(profile_data: ProfileCreate):
     """
-    Create or update a profile in both Firestore and Qdrant.
+    Create or update a profile in both Firestore and Azure AI Search.
     
     This endpoint:
     1. Stores/updates the profile in Firestore
-    2. Generates embeddings for can_offer and wants_learn
-    3. Upserts vectors to Qdrant with profile metadata
+    2. Generates embeddings for skills_to_offer and services_needed
+    3. Upserts vectors to Azure AI Search with profile metadata
     
     The profile uses Firebase Auth UID as the unique identifier,
     combining authentication fields (uid, email, displayName, photoUrl)
@@ -64,7 +64,7 @@ def upsert_profile(profile_data: ProfileCreate):
         offer_vec = embedding_service.encode(profile_data.skills_to_offer)
         need_vec = embedding_service.encode(profile_data.services_needed)
         
-        # Prepare payload for Qdrant (include all searchable fields)
+        # Prepare payload for Azure AI Search (include all searchable fields)
         payload = {
             "uid": profile_data.uid,
             "email": profile_data.email,
@@ -174,12 +174,12 @@ def update_profile(uid: str, profile_update: ProfileUpdate):
     # Update Firestore
     updated_profile = firebase_service.update_profile(uid, update_dict)
     
-    # If skills changed, update Qdrant embeddings
+    # If skills changed, update Azure AI Search embeddings
     if 'skills_to_offer' in update_dict or 'services_needed' in update_dict:
         skills_to_offer = updated_profile.get('skills_to_offer', existing_profile.get('skills_to_offer'))
         services_needed = updated_profile.get('services_needed', existing_profile.get('services_needed'))
         
-        # Only update Qdrant if both skills are present
+        # Only update Azure AI Search if both skills are present
         if skills_to_offer and services_needed:
             # Regenerate embeddings
             offer_vec = embedding_service.encode(skills_to_offer)
@@ -215,7 +215,7 @@ def update_profile(uid: str, profile_update: ProfileUpdate):
 @router.delete("/{uid}")
 def delete_profile(uid: str):
     """
-    Delete a profile from both Firestore and Qdrant.
+    Delete a profile from both Firestore and Azure AI Search.
     
     Args:
         uid: Firebase Auth user ID
