@@ -8,11 +8,11 @@ class LandingPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const bg = Color(0xFF0A0A0B); // near-black
-    const surface = Color(0xFF0F1115); // black-ish card
-    const surfaceAlt = Color(0xFF12141B); // slightly lighter card
-    const textPrimary = Color(0xFFEAEAF2);
-    const textMuted = Color(0xFFB6BDD0);
+    const bg = Color(0xFFFAFAFC); // light background
+    const surface = Colors.white; // white card
+    const surfaceAlt = Color(0xFFF3F4F6); // light gray card
+    const textPrimary = Color(0xFF1F2937); // dark gray text
+    const textMuted = Color(0xFF6B7280); // medium gray text
     const accent = Color(0xFF7C3AED); // purple
     const accentAlt = Color(0xFF9F67FF); // light purple for hovers/borders
 
@@ -323,9 +323,9 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const textPrimary = Color(0xFFEAEAF2);
-    const textMuted = Color(0xFFB6BDD0);
-    const surfaceAlt = Color(0xFF12141B);
+    const textPrimary = Color(0xFF1F2937);
+    const textMuted = Color(0xFF6B7280);
+    const surfaceAlt = Colors.white;
 
     return Container(
       width: 260,
@@ -335,7 +335,7 @@ class _StatCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(.25),
+            color: Colors.black.withOpacity(.08),
             blurRadius: 18,
             offset: const Offset(0, 12),
           ),
@@ -347,10 +347,10 @@ class _StatCard extends StatelessWidget {
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(.06),
+              color: const Color(0xFF7C3AED).withOpacity(.1),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.verified, color: textPrimary, size: 20),
+            child: const Icon(Icons.verified, color: Color(0xFF7C3AED), size: 20),
           ),
           const SizedBox(height: 10),
           Text(
@@ -446,9 +446,9 @@ class _StepCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const surfaceAlt = Color(0xFF12141B);
-    const textPrimary = Color(0xFFEAEAF2);
-    const textMuted = Color(0xFFB6BDD0);
+    const surfaceAlt = Colors.white;
+    const textPrimary = Color(0xFF1F2937);
+    const textMuted = Color(0xFF6B7280);
     const accent = Color(0xFF7C3AED);
 
     return Container(
@@ -457,7 +457,14 @@ class _StepCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: surfaceAlt,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withOpacity(.06)),
+        border: Border.all(color: Colors.black.withOpacity(.06)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -595,21 +602,28 @@ class _CategoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const surfaceAlt = Color(0xFF12141B);
-    const textPrimary = Color(0xFFEAEAF2);
-    const textMuted = Color(0xFFB6BDD0);
+    const surfaceAlt = Colors.white;
+    const textPrimary = Color(0xFF1F2937);
+    const textMuted = Color(0xFF6B7280);
 
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: surfaceAlt,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withOpacity(.06)),
+        border: Border.all(color: Colors.black.withOpacity(.06)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: textPrimary),
+          Icon(icon, color: const Color(0xFF7C3AED)),
           const SizedBox(height: 10),
           Text(
             title,
@@ -631,7 +645,7 @@ class _CategoryCard extends StatelessWidget {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(.06),
+                      color: const Color(0xFFF3F4F6),
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(c, style: const TextStyle(color: textMuted)),
@@ -728,9 +742,9 @@ class _TestimonialCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const surfaceAlt = Color(0xFF12141B);
-    const textPrimary = Color(0xFFEAEAF2);
-    const textMuted = Color(0xFFB6BDD0);
+    const surfaceAlt = Colors.white;
+    const textPrimary = Color(0xFF1F2937);
+    const textMuted = Color(0xFF6B7280);
 
     return Container(
       width: 360,
@@ -738,7 +752,14 @@ class _TestimonialCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: surfaceAlt,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withOpacity(.06)),
+        border: Border.all(color: Colors.black.withOpacity(.06)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -746,10 +767,10 @@ class _TestimonialCard extends StatelessWidget {
           Row(
             children: [
               CircleAvatar(
-                backgroundColor: Colors.white.withOpacity(.08),
+                backgroundColor: const Color(0xFF7C3AED).withOpacity(.1),
                 child: Text(
                   initials,
-                  style: const TextStyle(color: textPrimary),
+                  style: const TextStyle(color: Color(0xFF7C3AED)),
                 ),
               ),
               const SizedBox(width: 10),
@@ -770,7 +791,7 @@ class _TestimonialCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(.06),
+              color: const Color(0xFFF3F4F6),
               borderRadius: BorderRadius.circular(999),
             ),
             child: Text(chip, style: const TextStyle(color: textMuted)),
