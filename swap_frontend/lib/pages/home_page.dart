@@ -8,6 +8,7 @@ import '../services/auth_service.dart';
 import '../widgets/app_sidebar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'user_profile_page.dart';
+import 'skill_detail_page.dart';
 // Removed debug-only imports (seed/upsert/test helpers)
 
 class HomePage extends StatefulWidget {
@@ -226,25 +227,33 @@ class _DiscoverPaneState extends State<_DiscoverPane> {
   Future<void> _loadSkillsFromFirestore() async {
     try {
       final currentUid = FirebaseAuth.instance.currentUser?.uid;
+      debugPrint('⭐ Loading skills for user: $currentUid');
+
       final snapshot = await FirebaseFirestore.instance
           .collection('skills')
           .get();
 
+      debugPrint('⭐ Found ${snapshot.docs.length} skill documents');
+
       final loadedSkills = snapshot.docs.map((doc) {
         final data = doc.data();
+        debugPrint('⭐ Skill: ${data['title']} by ${data['creatorUid']}');
         return _Skill(
           title: data['title'] ?? '',
           category: data['category'] ?? 'other',
           description: data['description'] ?? '',
+          difficulty: data['difficulty'] ?? 'Beginner',
           durationHours: data['estimatedHours'] ?? 1,
           mode: data['deliveryFormat'] ?? 'Remote',
           rating: (data['rating'] ?? 4.5).toDouble(),
           tags: List<String>.from(data['tags'] ?? []),
+          deliverables: List<String>.from(data['deliverables'] ?? []),
           verified: data['verified'] ?? false,
           isNew: data['isNew'] ?? false,
           creatorUid: data['creatorUid'] ?? '',
           creatorName: data['creatorName'] ?? 'Anonymous',
           creatorPhotoUrl: data['creatorPhotoUrl'] as String?,
+          servicesNeeded: data['creatorServicesNeeded'] as String?,
         );
       }).toList();
 
@@ -253,6 +262,8 @@ class _DiscoverPaneState extends State<_DiscoverPane> {
           .where((skill) => skill.creatorUid != currentUid)
           .toList();
 
+      debugPrint('⭐ After filtering own skills: ${filteredSkills.length} remaining');
+
       if (mounted) {
         setState(() {
           skills = filteredSkills;
@@ -260,7 +271,7 @@ class _DiscoverPaneState extends State<_DiscoverPane> {
         });
       }
     } catch (e) {
-      debugPrint('Error loading skills: $e');
+      debugPrint('❌ Error loading skills: $e');
       if (mounted) {
         setState(() => _loadingSkills = false);
       }
@@ -636,8 +647,8 @@ class _DiscoverPaneState extends State<_DiscoverPane> {
                           crossAxisCount: crossAxisCount,
                           mainAxisSpacing: 18,
                           crossAxisSpacing: 18,
-                          // increase card height slightly to avoid occasional overflow
-                          mainAxisExtent: 260,
+                          // increase card height to fit "Looking for" section
+                          mainAxisExtent: 310,
                         ),
                         itemBuilder: (context, i) =>
                             _SkillCard(skill: skills[i]),
@@ -686,17 +697,27 @@ class _SkillCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: () {
-        if (skill.creatorUid.isNotEmpty) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => UserProfilePage(
-                uid: skill.creatorUid,
-                initialName: skill.creatorName,
-              ),
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => SkillDetailPage(
+              title: skill.title,
+              description: skill.description,
+              category: skill.category,
+              difficulty: skill.difficulty,
+              durationHours: skill.durationHours,
+              mode: skill.mode,
+              rating: skill.rating,
+              tags: skill.tags,
+              deliverables: skill.deliverables,
+              verified: skill.verified,
+              creatorUid: skill.creatorUid,
+              creatorName: skill.creatorName,
+              creatorPhotoUrl: skill.creatorPhotoUrl,
+              servicesNeeded: skill.servicesNeeded,
             ),
-          );
-        }
+          ),
+        );
       },
       borderRadius: BorderRadius.circular(14),
       child: Card(
@@ -741,15 +762,61 @@ class _SkillCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 6),
-            Expanded(
-              child: Text(
-                skill.description,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: HomePage.textMuted, fontSize: 13),
-              ),
+            Text(
+              skill.description,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: HomePage.textMuted, fontSize: 13),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
+
+            // Looking for section
+            if (skill.servicesNeeded != null && skill.servicesNeeded!.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: HomePage.accent.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: HomePage.accent.withOpacity(0.3)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.search,
+                      size: 14,
+                      color: HomePage.accentAlt,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Looking for:',
+                            style: TextStyle(
+                              color: HomePage.accentAlt,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            skill.servicesNeeded!,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: HomePage.textPrimary,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            const Spacer(),
 
             // meta + actions
             Row(
@@ -934,29 +1001,35 @@ class _Skill {
   final String title;
   final String category; // small label (music/writing/coding/etc)
   final String description;
+  final String difficulty; // Beginner / Intermediate / Advanced
   final int durationHours;
   final String mode; // Remote / In-person / Both
   final double rating;
   final List<String> tags;
+  final List<String> deliverables; // What they'll deliver
   final bool verified;
   final bool isNew;
   final String creatorUid; // Link to profile
   final String creatorName;
   final String? creatorPhotoUrl; // Creator's profile picture
+  final String? servicesNeeded; // What the creator is looking for
 
   _Skill({
     required this.title,
     required this.category,
     required this.description,
+    this.difficulty = 'Beginner',
     required this.durationHours,
     required this.mode,
     required this.rating,
     required this.tags,
+    this.deliverables = const [],
     this.verified = false,
     this.isNew = false,
     this.creatorUid = '',
     this.creatorName = '',
     this.creatorPhotoUrl,
+    this.servicesNeeded,
   });
 }
 

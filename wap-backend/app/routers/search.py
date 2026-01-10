@@ -18,7 +18,7 @@ class SearchRequest(BaseModel):
     
     query: str = Field(..., min_length=1, description="Search query")
     limit: int = Field(10, ge=1, le=100, description="Max results")
-    score_threshold: float = Field(0.3, ge=0, le=1, description="Minimum similarity score")
+    score_threshold: float = Field(0.65, ge=0, le=1, description="Minimum similarity score")
     mode: Literal["offers", "needs", "both"] = Field("offers", description="Which vector to search")
 
 

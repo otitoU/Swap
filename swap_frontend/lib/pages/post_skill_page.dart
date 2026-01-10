@@ -112,21 +112,27 @@ class _PostSkillPageState extends State<PostSkillPage> {
     );
 
     try {
-      // Fetch user's profile photo from Firestore profile
+      // Fetch user's profile data from Firestore
       String? creatorPhotoUrl = user.photoURL;
+      String? creatorServicesNeeded;
       try {
         final profileDoc = await FirebaseFirestore.instance
-            .collection('profiles')
+            .collection('users')
             .doc(user.uid)
             .get();
         if (profileDoc.exists) {
           final profileData = profileDoc.data();
-          if (profileData != null && profileData['photoUrl'] != null) {
-            creatorPhotoUrl = profileData['photoUrl'] as String;
+          if (profileData != null) {
+            if (profileData['photoUrl'] != null) {
+              creatorPhotoUrl = profileData['photoUrl'] as String;
+            }
+            // Get what the creator is looking for
+            creatorServicesNeeded = profileData['servicesNeeded'] as String?
+                ?? profileData['services_needed'] as String?;
           }
         }
       } catch (e) {
-        debugPrint('Could not fetch profile photo: $e');
+        debugPrint('Could not fetch profile: $e');
       }
 
       // Create skill document
@@ -142,7 +148,8 @@ class _PostSkillPageState extends State<PostSkillPage> {
         'creatorUid': user.uid,
         'creatorEmail': user.email ?? '',
         'creatorName': user.displayName ?? user.email ?? 'Anonymous',
-        'creatorPhotoUrl': creatorPhotoUrl, // Save creator's profile picture
+        'creatorPhotoUrl': creatorPhotoUrl,
+        'creatorServicesNeeded': creatorServicesNeeded, // What the creator is looking for
         'createdAt': FieldValue.serverTimestamp(),
         'rating': 4.5, // Default rating for new skills
         'verified': false, // Can be set to true by admin later

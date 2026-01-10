@@ -604,15 +604,27 @@ class _SwapRequestDialogState extends State<SwapRequestDialog> {
     debugPrint('SwapDialog: Loading data for uid: $uid');
     if (uid == null) return;
 
-    // Load points balance (non-blocking - don't fail if backend is down)
+    // Load points balance (try backend first, fallback to Firestore)
     int points = 0;
     try {
       final pointsService = PointsService();
       final balance = await pointsService.getBalance(uid);
       points = balance.swapPoints;
+      debugPrint('SwapDialog: Points from backend: $points');
     } catch (e) {
       debugPrint('SwapDialog: Points service unavailable: $e');
-      // Continue without points - skills are more important
+      // Fallback: try loading from Firestore profile
+      try {
+        final profileDoc = await FirebaseFirestore.instance
+            .collection('profiles')
+            .doc(uid)
+            .get();
+        points = (profileDoc.data()?['swap_points'] ??
+                  profileDoc.data()?['swapPoints'] ?? 0) as int;
+        debugPrint('SwapDialog: Points from Firestore fallback: $points');
+      } catch (e2) {
+        debugPrint('SwapDialog: Firestore points fallback failed: $e2');
+      }
     }
 
     try {
@@ -621,7 +633,14 @@ class _SwapRequestDialogState extends State<SwapRequestDialog> {
           .collection('profiles')
           .doc(uid)
           .get();
-      
+
+      // Also get points from profile if not already loaded from backend
+      if (points == 0) {
+        points = (profileDoc.data()?['swap_points'] ??
+                  profileDoc.data()?['swapPoints'] ?? 0) as int;
+        debugPrint('SwapDialog: Points from profile: $points');
+      }
+
       final profileSkills = (profileDoc.data()?['skillsToOffer'] as List<dynamic>?)
           ?.cast<Map<String, dynamic>>() ?? [];
       debugPrint('SwapDialog: Profile skills: ${profileSkills.length}');

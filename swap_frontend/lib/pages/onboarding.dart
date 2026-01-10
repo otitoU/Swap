@@ -271,6 +271,14 @@ class _ProfileSetupFlowState extends State<ProfileSetupFlow> {
 
       // Build payload. Because _offer/_need are prefilled from Firestore,
       // they will only be empty if the user intentionally removed them.
+      // Check if this is a new user (no existing swap_points)
+      final existingProfile = await FirebaseFirestore.instance
+          .collection('profiles')
+          .doc(user.uid)
+          .get();
+      final isNewUser = !existingProfile.exists ||
+          existingProfile.data()?['swap_points'] == null;
+
       final userData = <String, dynamic>{
         'uid': user.uid, // Store uid in document for linking skills
         'email': user.email,
@@ -294,6 +302,10 @@ class _ProfileSetupFlowState extends State<ProfileSetupFlow> {
         'emailUpdates': _emailUpdates,
         'showCity': _showCity,
         'onboardingComplete': true, // Mark onboarding as done
+        // Initialize points for new users only
+        if (isNewUser) 'swap_points': 50,
+        if (isNewUser) 'swap_credits': 0,
+        if (isNewUser) 'completed_swap_count': 0,
         if (photoUrl != null) 'photoUrl': photoUrl, // keep existing if null
       };
 
