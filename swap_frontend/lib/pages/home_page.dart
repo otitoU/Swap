@@ -235,9 +235,66 @@ class _DiscoverPaneState extends State<_DiscoverPane> {
 
       debugPrint('⭐ Found ${snapshot.docs.length} skill documents');
 
+      // Collect creator UIDs that need profile fetch (no servicesNeeded in skill)
+      final creatorUidsNeedingProfile = <String>{};
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final uid = data['creatorUid'] as String?;
+        final hasServicesNeeded = data['creatorServicesNeeded'] != null &&
+            (data['creatorServicesNeeded'] as String).isNotEmpty;
+        if (uid != null && uid.isNotEmpty && !hasServicesNeeded) {
+          creatorUidsNeedingProfile.add(uid);
+        }
+      }
+
+      // Batch fetch profiles to get servicesNeeded
+      final profilesMap = <String, Map<String, dynamic>>{};
+      if (creatorUidsNeedingProfile.isNotEmpty) {
+        try {
+          final uidList = creatorUidsNeedingProfile.toList();
+          for (var i = 0; i < uidList.length; i += 10) {
+            final batch = uidList.sublist(
+              i,
+              i + 10 > uidList.length ? uidList.length : i + 10,
+            );
+            final profilesSnapshot = await FirebaseFirestore.instance
+                .collection('profiles')
+                .where(FieldPath.documentId, whereIn: batch)
+                .get();
+            for (final doc in profilesSnapshot.docs) {
+              profilesMap[doc.id] = doc.data();
+            }
+          }
+          debugPrint('⭐ Fetched ${profilesMap.length} profiles for servicesNeeded');
+        } catch (e) {
+          debugPrint('⭐ Error fetching profiles: $e');
+        }
+      }
+
       final loadedSkills = snapshot.docs.map((doc) {
         final data = doc.data();
-        debugPrint('⭐ Skill: ${data['title']} by ${data['creatorUid']}');
+        final creatorUid = data['creatorUid'] ?? '';
+
+        // Get servicesNeeded - first from skill, then from profile
+        String? servicesNeeded = data['creatorServicesNeeded'] as String?;
+        if ((servicesNeeded == null || servicesNeeded.isEmpty) &&
+            profilesMap.containsKey(creatorUid)) {
+          final profile = profilesMap[creatorUid]!;
+          final rawNeeds = profile['servicesNeeded'] ?? profile['services_needed'];
+          if (rawNeeds is String) {
+            servicesNeeded = rawNeeds;
+          } else if (rawNeeds is List) {
+            servicesNeeded = rawNeeds.map((need) {
+              if (need is Map) {
+                final name = need['name'] ?? need['title'] ?? '';
+                final level = need['level'] ?? '';
+                return level.toString().isNotEmpty ? '$name ($level)' : name;
+              }
+              return need.toString();
+            }).join(', ');
+          }
+        }
+
         return _Skill(
           title: data['title'] ?? '',
           category: data['category'] ?? 'other',
@@ -250,10 +307,10 @@ class _DiscoverPaneState extends State<_DiscoverPane> {
           deliverables: List<String>.from(data['deliverables'] ?? []),
           verified: data['verified'] ?? false,
           isNew: data['isNew'] ?? false,
-          creatorUid: data['creatorUid'] ?? '',
+          creatorUid: creatorUid,
           creatorName: data['creatorName'] ?? 'Anonymous',
           creatorPhotoUrl: data['creatorPhotoUrl'] as String?,
-          servicesNeeded: data['creatorServicesNeeded'] as String?,
+          servicesNeeded: servicesNeeded,
         );
       }).toList();
 

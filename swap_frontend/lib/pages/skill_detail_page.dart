@@ -53,9 +53,13 @@ class _SkillDetailPageState extends State<SkillDetailPage> {
   List<SwapRequest>? _swapHistory;
   bool _loadingSwapHistory = true;
 
+  // Creator's services needed (fetched from profile if not provided)
+  String? _creatorServicesNeeded;
+
   @override
   void initState() {
     super.initState();
+    _creatorServicesNeeded = widget.servicesNeeded;
     _loadProfileData();
     _loadSwapHistory();
   }
@@ -93,8 +97,31 @@ class _SkillDetailPageState extends State<SkillDetailPage> {
           .get();
 
       if (mounted) {
+        final profileData = profileDoc.data();
+
+        // Extract services needed from profile if not already set
+        String? servicesNeeded = _creatorServicesNeeded;
+        if ((servicesNeeded == null || servicesNeeded.isEmpty) && profileData != null) {
+          // Try to get from profile - could be List or String
+          final rawNeeds = profileData['servicesNeeded'] ?? profileData['services_needed'];
+          if (rawNeeds is String) {
+            servicesNeeded = rawNeeds;
+          } else if (rawNeeds is List) {
+            // Convert list of skill maps to readable string
+            servicesNeeded = rawNeeds.map((need) {
+              if (need is Map) {
+                final name = need['name'] ?? need['title'] ?? '';
+                final level = need['level'] ?? '';
+                return level.toString().isNotEmpty ? '$name ($level)' : name;
+              }
+              return need.toString();
+            }).join(', ');
+          }
+        }
+
         setState(() {
-          _profileData = profileDoc.data();
+          _profileData = profileData;
+          _creatorServicesNeeded = servicesNeeded;
           _userSkills = skillsSnapshot.docs
               .map((doc) => doc.data())
               .where((skill) => skill['title'] != widget.title) // Exclude current skill
@@ -299,7 +326,7 @@ class _SkillDetailPageState extends State<SkillDetailPage> {
         const SizedBox(height: 24),
 
         // What they're looking for
-        if (widget.servicesNeeded != null && widget.servicesNeeded!.isNotEmpty) ...[
+        if (_creatorServicesNeeded != null && _creatorServicesNeeded!.isNotEmpty) ...[
           _SectionTitle('What They\'re Looking For'),
           const SizedBox(height: 12),
           Container(
@@ -321,7 +348,7 @@ class _SkillDetailPageState extends State<SkillDetailPage> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    widget.servicesNeeded!,
+                    _creatorServicesNeeded!,
                     style: const TextStyle(
                       color: HomePage.textPrimary,
                       fontSize: 15,
@@ -339,6 +366,27 @@ class _SkillDetailPageState extends State<SkillDetailPage> {
               color: HomePage.textMuted,
               fontSize: 13,
               fontStyle: FontStyle.italic,
+            ),
+          ),
+          const SizedBox(height: 24),
+        ]
+        else if (_loadingProfile) ...[
+          _SectionTitle('What They\'re Looking For'),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: HomePage.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: HomePage.line),
+            ),
+            child: const Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
             ),
           ),
           const SizedBox(height: 24),
