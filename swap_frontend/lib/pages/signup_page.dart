@@ -169,7 +169,7 @@ class _SignUpPageState extends State<SignUpPage> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0D0D),
+      backgroundColor: const Color(0xFF000000),
       body: SafeArea(
         child: Stack(
           children: [
@@ -204,32 +204,33 @@ class _SignUpPageState extends State<SignUpPage> {
 
   Widget _SignUpCard() {
     InputDecoration deco(String label, IconData icon) => InputDecoration(
-      prefixIcon: Icon(icon, color: Colors.grey),
+      prefixIcon: Icon(icon, color: const Color(0xFFA1A1AA)),
       labelText: label,
-      labelStyle: const TextStyle(color: Colors.grey),
+      labelStyle: const TextStyle(color: Color(0xFFA1A1AA)),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(30),
-        borderSide: const BorderSide(color: Colors.grey),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFF27272A)),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(30),
-        borderSide: const BorderSide(color: Colors.deepPurpleAccent),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFF7C3AED), width: 2),
       ),
       filled: true,
-      fillColor: Colors.white.withOpacity(0.05),
+      fillColor: const Color(0xFF0F0F11),
     );
 
     Widget social(IconData icon, VoidCallback? onTap) => InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(50),
+      borderRadius: BorderRadius.circular(14),
       child: Container(
-        height: 48,
-        width: 48,
+        height: 52,
+        width: 52,
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.1),
-          shape: BoxShape.circle,
+          color: const Color(0xFF0F0F11),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFF27272A)),
         ),
-        child: Icon(icon, color: Colors.white),
+        child: Icon(icon, color: Colors.white, size: 24),
       ),
     );
 
@@ -247,13 +248,13 @@ class _SignUpPageState extends State<SignUpPage> {
     return Container(
       constraints: const BoxConstraints(maxWidth: 420),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.4),
+        color: const Color(0xFF0A0A0C),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
+        border: Border.all(color: const Color(0xFF27272A)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.6),
-            blurRadius: 20,
+            color: const Color(0xFF7C3AED).withOpacity(0.1),
+            blurRadius: 40,
             offset: const Offset(0, 8),
           ),
         ],
@@ -370,21 +371,28 @@ class _SignUpPageState extends State<SignUpPage> {
               // Create account
               Container(
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(30),
+                  borderRadius: BorderRadius.circular(14),
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF7A00FF), Color(0xFF9E00FF)],
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
+                    colors: [Color(0xFF7C3AED), Color(0xFF9F67FF)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF7C3AED).withOpacity(0.3),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.transparent,
                     shadowColor: Colors.transparent,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
+                      borderRadius: BorderRadius.circular(14),
                     ),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                   onPressed: _loading ? null : _signup,
                   child: _loading
@@ -519,7 +527,7 @@ class _Rainbow3DPanel extends StatelessWidget {
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: Color(0x407A00FF),
+                color: Color(0x407C3AED),
                 blurRadius: 100,
                 spreadRadius: 12,
               ),

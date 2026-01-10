@@ -18,8 +18,13 @@ class MyApp extends StatelessWidget {
       title: r'$WAP',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFFFA726)),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF7C3AED),
+          brightness: Brightness.dark,
+        ),
+        scaffoldBackgroundColor: const Color(0xFF000000),
         useMaterial3: true,
+        fontFamily: 'SF Pro Display',
         inputDecorationTheme: const InputDecorationTheme(
           border: OutlineInputBorder(),
         ),

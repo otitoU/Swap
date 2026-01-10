@@ -15,14 +15,15 @@ class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
   // ---- Theme (same palette family you’ve been using)
-  static const Color bg = Color(0xFF0A0A0B);
-  static const Color sidebar = Color(0xFF0F1115);
-  static const Color surface = Color(0xFF12141B);
-  static const Color surfaceAlt = Color(0xFF12141B);
-  static const Color card = Color(0xFF111318);
-  static const Color textPrimary = Color(0xFFEAEAF2);
-  static const Color textMuted = Color(0xFFB6BDD0);
-  static const Color line = Color(0xFF1F2937);
+  static const Color bg = Color(0xFF000000);
+  static const Color sidebar = Color(0xFF0A0A0C);
+  static const Color surface = Color(0xFF0F0F11);
+  static const Color surfaceAlt = Color(0xFF111113);
+  static const Color card = Color(0xFF0F0F11);
+  static const Color textPrimary = Color(0xFFFFFFFF);
+  static const Color textMuted = Color(0xFFA1A1AA);
+  static const Color textSecondary = Color(0xFF71717A);
+  static const Color line = Color(0xFF27272A);
   static const Color accent = Color(0xFF7C3AED); // purple
   static const Color accentAlt = Color(0xFF9F67FF);
   static const Color success = Color(0xFF22C55E);
@@ -314,12 +315,9 @@ class _DiscoverPaneState extends State<_DiscoverPane> {
         );
       }).toList();
 
-      // Filter out current user's own skills - they shouldn't see their own posts
-      final filteredSkills = loadedSkills
-          .where((skill) => skill.creatorUid != currentUid)
-          .toList();
-
-      debugPrint('⭐ After filtering own skills: ${filteredSkills.length} remaining');
+      // Filter out current user's own skills - marketplace should show others' skills
+      final filteredSkills = loadedSkills.where((skill) => skill.creatorUid != currentUid).toList();
+      debugPrint('⭐ Total skills loaded: ${loadedSkills.length}, showing ${filteredSkills.length} (excluding own)');
 
       if (mounted) {
         setState(() {
@@ -702,10 +700,9 @@ class _DiscoverPaneState extends State<_DiscoverPane> {
                         itemCount: skills.length,
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: crossAxisCount,
-                          mainAxisSpacing: 18,
-                          crossAxisSpacing: 18,
-                          // increase card height to fit "Looking for" section
-                          mainAxisExtent: 310,
+                          mainAxisSpacing: 14,
+                          crossAxisSpacing: 14,
+                          mainAxisExtent: 190,
                         ),
                         itemBuilder: (context, i) =>
                             _SkillCard(skill: skills[i]),
@@ -721,25 +718,48 @@ class _DiscoverPaneState extends State<_DiscoverPane> {
 
 /* ============================== WIDGET PIECES ============================= */
 
-class _CategoryChip extends StatelessWidget {
+class _CategoryChip extends StatefulWidget {
   const _CategoryChip({required this.label, this.selected = false});
   final String label;
   final bool selected;
 
   @override
+  State<_CategoryChip> createState() => _CategoryChipState();
+}
+
+class _CategoryChipState extends State<_CategoryChip> {
+  bool _hovering = false;
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: selected ? const Color(0xFF1A1333) : HomePage.surface,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: HomePage.line),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: selected ? HomePage.accentAlt : HomePage.textPrimary,
-          fontWeight: FontWeight.w600,
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovering = true),
+      onExit: (_) => setState(() => _hovering = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: widget.selected
+              ? HomePage.accent.withOpacity(0.15)
+              : _hovering
+                  ? HomePage.surfaceAlt
+                  : HomePage.surface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: widget.selected
+                ? HomePage.accent.withOpacity(0.3)
+                : _hovering
+                    ? HomePage.line
+                    : HomePage.line.withOpacity(0.5),
+          ),
+        ),
+        child: Text(
+          widget.label,
+          style: TextStyle(
+            color: widget.selected ? HomePage.accentAlt : HomePage.textPrimary,
+            fontWeight: widget.selected ? FontWeight.w600 : FontWeight.w500,
+            fontSize: 13,
+          ),
         ),
       ),
     );
@@ -752,7 +772,7 @@ class _SkillCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
@@ -776,240 +796,120 @@ class _SkillCard extends StatelessWidget {
           ),
         );
       },
-      borderRadius: BorderRadius.circular(14),
-      child: Card(
-        elevation: 0,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // top badges row
-              Row(
-                children: [
-                  _Pill(skill.category),
-                  const SizedBox(width: 8),
-                  if (skill.verified)
-                    const _Pill(
-                      'Verified',
-                      icon: Icons.verified,
-                      color: HomePage.success,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: HomePage.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: HomePage.line.withOpacity(0.5)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Top row: category + rating
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: HomePage.bg,
+                    borderRadius: BorderRadius.circular(5),
+                  ),
+                  child: Text(
+                    skill.category,
+                    style: const TextStyle(color: HomePage.textMuted, fontSize: 11, fontWeight: FontWeight.w500),
+                  ),
+                ),
+                if (skill.isNew) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF34C759).withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(4),
                     ),
-                  if (skill.isNew) ...[
-                    const SizedBox(width: 6),
-                    const _Pill('New', color: HomePage.warning),
-                  ],
-                  const Spacer(),
-                  IconButton(
-                    onPressed: () {},
-                    icon: const Icon(Icons.favorite_border, size: 20),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    splashRadius: 18,
+                    child: const Text('NEW', style: TextStyle(color: Color(0xFF34C759), fontSize: 9, fontWeight: FontWeight.w700)),
                   ),
                 ],
-              ),
+                const Spacer(),
+                const Icon(Icons.star_rounded, size: 14, color: Color(0xFFFFD60A)),
+                const SizedBox(width: 3),
+                Text(skill.rating.toStringAsFixed(1), style: const TextStyle(color: HomePage.textPrimary, fontSize: 12, fontWeight: FontWeight.w600)),
+              ],
+            ),
             const SizedBox(height: 10),
+
+            // Title
             Text(
               skill.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: HomePage.textPrimary,
-                fontWeight: FontWeight.w800,
-                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                fontSize: 15,
+                height: 1.3,
               ),
             ),
             const SizedBox(height: 6),
+
+            // Description
             Text(
               skill.description,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: HomePage.textMuted, fontSize: 13),
+              style: const TextStyle(color: HomePage.textMuted, fontSize: 12, height: 1.4),
             ),
-            const SizedBox(height: 8),
-
-            // Looking for section
-            if (skill.servicesNeeded != null && skill.servicesNeeded!.isNotEmpty)
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: HomePage.accent.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: HomePage.accent.withOpacity(0.3)),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      Icons.search,
-                      size: 14,
-                      color: HomePage.accentAlt,
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Looking for:',
-                            style: TextStyle(
-                              color: HomePage.accentAlt,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            skill.servicesNeeded!,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: HomePage.textPrimary,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             const Spacer(),
 
-            // meta + actions
+            // Bottom row: creator + swap button
             Row(
               children: [
-                const Icon(
-                  Icons.access_time,
-                  size: 16,
-                  color: HomePage.textMuted,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  '${skill.durationHours}h',
-                  style: const TextStyle(color: HomePage.textMuted),
-                ),
-                const SizedBox(width: 12),
-                const Icon(Icons.public, size: 16, color: HomePage.textMuted),
-                const SizedBox(width: 6),
-                Text(
-                  skill.mode,
-                  style: const TextStyle(color: HomePage.textMuted),
-                ),
-                const Spacer(),
-                const Icon(Icons.star_rounded, size: 18, color: Colors.amber),
-                const SizedBox(width: 4),
-                Text(
-                  '${skill.rating}',
-                  style: const TextStyle(
-                    color: HomePage.textPrimary,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-
-            // Creator row with avatar
-            if (skill.creatorName.isNotEmpty)
-              Row(
-                children: [
-                  CircleAvatar(
-                    radius: 12,
-                    backgroundColor: HomePage.surface,
-                    backgroundImage: skill.creatorPhotoUrl != null && skill.creatorPhotoUrl!.isNotEmpty
-                        ? NetworkImage(skill.creatorPhotoUrl!)
-                        : null,
-                    child: skill.creatorPhotoUrl == null || skill.creatorPhotoUrl!.isEmpty
-                        ? Text(
-                            skill.creatorName.isNotEmpty 
-                                ? skill.creatorName[0].toUpperCase() 
-                                : 'U',
-                            style: const TextStyle(
-                              color: HomePage.textMuted,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          )
-                        : null,
-                  ),
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Text(
-                      skill.creatorName,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: HomePage.accentAlt,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            const SizedBox(height: 8),
-
-            // tags + button: use a Row so the button can align to the right reliably.
-            Row(
-              children: [
-                Flexible(
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        for (final t in skill.tags.take(3))
-                          Container(
-                            margin: const EdgeInsets.only(right: 8),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: HomePage.surface,
-                              borderRadius: BorderRadius.circular(999),
-                              border: Border.all(color: HomePage.line),
-                            ),
-                            child: Text(
-                              t,
-                              style: const TextStyle(
-                                color: HomePage.textMuted,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
+                CircleAvatar(
+                  radius: 12,
+                  backgroundColor: const Color(0xFF2C2C2E),
+                  backgroundImage: skill.creatorPhotoUrl != null && skill.creatorPhotoUrl!.isNotEmpty
+                      ? NetworkImage(skill.creatorPhotoUrl!)
+                      : null,
+                  child: skill.creatorPhotoUrl == null || skill.creatorPhotoUrl!.isEmpty
+                      ? Text(
+                          skill.creatorName.isNotEmpty ? skill.creatorName[0].toUpperCase() : 'U',
+                          style: const TextStyle(color: HomePage.textMuted, fontSize: 10, fontWeight: FontWeight.w600),
+                        )
+                      : null,
                 ),
                 const SizedBox(width: 8),
-                SizedBox(
-                  height: 40,
-                  child: FilledButton.icon(
-                    onPressed: () {
-                      if (skill.creatorUid.isNotEmpty) {
-                        showSwapRequestDialog(
-                          context,
-                          recipientUid: skill.creatorUid,
-                          recipientName: skill.creatorName,
-                          preSelectedSkill: skill.title,
-                        );
-                      }
-                    },
-                    icon: const Icon(Icons.mail_outline, size: 18),
-                    label: const Text('Request'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: HomePage.accent,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
+                Expanded(
+                  child: Text(
+                    skill.creatorName,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: HomePage.textMuted, fontSize: 12),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () {
+                    if (skill.creatorUid.isNotEmpty) {
+                      showSwapRequestDialog(
+                        context,
+                        recipientUid: skill.creatorUid,
+                        recipientName: skill.creatorName,
+                        preSelectedSkill: skill.title,
+                      );
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: HomePage.accent,
+                      borderRadius: BorderRadius.circular(8),
                     ),
+                    child: const Text('Swap', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
                   ),
                 ),
               ],
             ),
           ],
         ),
-      ),
       ),
     );
   }
