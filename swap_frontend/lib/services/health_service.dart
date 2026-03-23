@@ -1,6 +1,6 @@
 import 'package:http/http.dart' as http;
 
-import '../config/app_config.dart';
+import '../config.dart';
 
 class HealthService {
   final String baseUrl;

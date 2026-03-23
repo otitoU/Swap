@@ -1,8 +1,8 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_storage/firebase_storage.dart' as storage;
 
+import '../services/b2c_auth_service.dart';
+import '../services/profile_service.dart';
+import '../services/skill_service.dart';
 import '../widgets/app_sidebar.dart';
 import '../services/portfolio_service.dart';
 import '../services/review_service.dart';
@@ -13,14 +13,19 @@ import 'post_skill_page.dart';
 import 'onboarding.dart';
 
 class ProfilePage extends StatelessWidget {
-  const ProfilePage({super.key});
+  const ProfilePage({super.key, this.uid});
+
+  /// If null, shows the current user's profile. If set, shows another user's profile.
+  final String? uid;
 
   static const double _gutter = 12;
 
   @override
   Widget build(BuildContext context) {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return const _AuthGuard();
+    final currentUid = B2CAuthService.instance.currentUser?.uid;
+    final targetUid = uid ?? currentUid;
+    if (targetUid == null) return const _AuthGuard();
+    final isOwnProfile = (uid == null || uid == currentUid);
 
     return Scaffold(
       backgroundColor: HomePage.bg,
@@ -28,71 +33,36 @@ class ProfilePage extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const AppSidebar(active: 'Profile'),
+            AppSidebar(active: isOwnProfile ? 'Profile' : ''),
             Expanded(
-              child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                stream: FirebaseFirestore.instance
-                    .collection('profiles')
-                    .doc(uid)
-                    .snapshots(),
+              child: FutureBuilder<Map<String, dynamic>?>(
+                future: ProfileService().getProfile(targetUid),
                 builder: (context, snap) {
                   if (snap.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
                   }
-                  if (!snap.hasData || !snap.data!.exists) {
+                  if (!snap.hasData || snap.data == null) {
                     return _EmptyProfileCard(
-                      onSetup: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const ProfileSetupFlow(),
-                          ),
-                        );
-                      },
+                      onSetup: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const ProfileSetupFlow(),
+                        ),
+                      ),
                     );
                   }
 
-                  final data = snap.data!.data()!;
-                  final name = (data['fullName'] ?? data['displayName'] ?? '')
-                      .toString()
-                      .trim();
+                  final data = snap.data!;
+                  final name = (data['full_name'] ?? data['display_name'] ?? '').toString().trim();
                   final username = (data['username'] ?? '').toString().trim();
                   final city = (data['city'] ?? '').toString().trim();
                   final bio = (data['bio'] ?? '').toString().trim();
-                  final photoUrl = data['photoUrl'] as String?;
+                  final photoUrl = data['photo_url'] as String?;
                   final timezone = (data['timezone'] ?? '').toString().trim();
-
-                  final verified = (data['verified'] ?? false) == true;
-                  final topRated = (data['topRated'] ?? false) == true;
-                  final joinedAt = _parseJoinedAt(data['joinedAt']);
-
-                  // Stats (from portfolio data or fallbacks)
-                  final swapsCompleted = (data['completed_swap_count'] ??
-                      data['swapsCompleted'] ??
-                      0) as int;
-                  final hoursTraded = (data['total_hours_traded'] ??
-                          data['hoursTraded'] ??
-                          0)
-                      .toDouble();
-                  final avgRating = (data['average_rating'] ??
-                          data['avgRating'] ??
-                          0)
-                      .toDouble();
-                  final responseRate = ((data['responseRate'] ?? 0).toDouble())
-                      .clamp(0, 100);
-                  final swapCredits = (data['swap_credits'] ?? 0) as int;
-                  final swapPoints = (data['swap_points'] ?? 0) as int;
-
-                  // Skills stored as arrays on the user doc
-                  final skillsToOffer =
-                      (data['skillsToOffer'] as List<dynamic>?)
-                          ?.cast<Map<String, dynamic>>() ??
-                      const [];
-                  final servicesNeeded =
-                      (data['servicesNeeded'] as List<dynamic>?)
-                          ?.cast<Map<String, dynamic>>() ??
-                      const [];
-                  final skillsCount = skillsToOffer.length;
-                  final reviewsCount = (data['reviewsCount'] ?? 0) as int;
+                  final skillsToOffer = (data['skills_to_offer'] ?? '').toString();
+                  final servicesNeeded = (data['services_needed'] ?? '').toString();
+                  final swapCredits = (data['swap_credits'] as num?)?.toInt() ?? 0;
+                  final swapsCompleted = (data['swaps_completed'] as num?)?.toInt() ?? 0;
+                  final joinedAt = DateTime.tryParse(data['created_at'] ?? '');
 
                   return SingleChildScrollView(
                     padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
@@ -102,8 +72,24 @@ class ProfilePage extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
+                            // Back button when viewing another user
+                            if (!isOwnProfile)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: TextButton.icon(
+                                    onPressed: () => Navigator.of(context).pop(),
+                                    icon: const Icon(Icons.arrow_back, size: 18),
+                                    label: const Text('Back'),
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: HomePage.textMuted,
+                                    ),
+                                  ),
+                                ),
+                              ),
                             _HeaderBanner(
-                              name: name.isEmpty ? 'Your Name' : name,
+                              name: name.isEmpty ? (isOwnProfile ? 'Your Name' : 'User') : name,
                               username: username,
                               city: city,
                               timezone: timezone,
@@ -111,111 +97,45 @@ class ProfilePage extends StatelessWidget {
                               joinedLabel: joinedAt == null
                                   ? 'Joined recently'
                                   : 'Joined ${_formatMonthYear(joinedAt)}',
-                              verified: verified,
-                              topRated: topRated,
-                              onEdit: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => const ProfileSetupFlow(),
-                                  ),
-                                );
-                              },
-                              onSettings: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Settings coming soon'),
-                                  ),
-                                );
-                              },
+                              swapCredits: swapCredits,
+                              swapsCompleted: swapsCompleted,
+                              verified: false,
+                              topRated: false,
+                              isOwnProfile: isOwnProfile,
+                              onEdit: isOwnProfile
+                                  ? () => Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => const ProfileSetupFlow(),
+                                      ),
+                                    )
+                                  : null,
+                              onSettings: isOwnProfile
+                                  ? () {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Settings coming soon')),
+                                      );
+                                    }
+                                  : null,
                             ),
-                            const SizedBox(height: 12),
-
-                            // Four compact stat tiles (dark)
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _StatCard(
-                                    icon: Icons.swap_horiz_rounded,
-                                    label: 'Swaps Completed',
-                                    value: swapsCompleted.toString(),
-                                  ),
-                                ),
-                                const SizedBox(width: _gutter),
-                                Expanded(
-                                  child: _StatCard(
-                                    icon: Icons.access_time,
-                                    label: 'Hours Traded',
-                                    value: '${hoursTraded.toStringAsFixed(1)}h',
-                                  ),
-                                ),
-                                const SizedBox(width: _gutter),
-                                Expanded(
-                                  child: _StatCard(
-                                    icon: Icons.star_rate_rounded,
-                                    label: 'Average Rating',
-                                    value: avgRating.toStringAsFixed(1),
-                                  ),
-                                ),
-                                const SizedBox(width: _gutter),
-                                Expanded(
-                                  child: _StatCard(
-                                    icon: Icons.monetization_on_outlined,
-                                    label: 'Swap Credits',
-                                    value: swapCredits.toString(),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: _gutter),
-                            // Second row of stats
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _StatCard(
-                                    icon: Icons.toll_rounded,
-                                    label: 'Swap Points',
-                                    value: swapPoints.toString(),
-                                  ),
-                                ),
-                                const SizedBox(width: _gutter),
-                                Expanded(
-                                  child: _StatCard(
-                                    icon: Icons.trending_up_rounded,
-                                    label: 'Response Rate',
-                                    value:
-                                        '${responseRate.toStringAsFixed(0)}%',
-                                  ),
-                                ),
-                                const SizedBox(width: _gutter),
-                                const Expanded(child: SizedBox()),
-                                const SizedBox(width: _gutter),
-                                const Expanded(child: SizedBox()),
-                              ],
-                            ),
-
                             const SizedBox(height: 16),
-
-                            // Tabs: My Skills / Reviews / Activity
                             _SegmentedTabs(
-                              skillsLabel: 'My Skills ($skillsCount)',
-                              reviewsLabel: 'Reviews ($reviewsCount)',
+                              skillsLabel: 'My Skills',
+                              reviewsLabel: 'Reviews',
                               activityLabel: 'Activity',
                               skillsBuilder: () => _SkillsSection(
+                                uid: targetUid,
+                                isOwnProfile: isOwnProfile,
                                 skillsToOffer: skillsToOffer,
                                 servicesNeeded: servicesNeeded,
-                                uid: uid,
-                                onPostFirst: () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => const PostSkillPage(),
-                                    ),
-                                  );
-                                },
+                                onPostFirst: () => Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => const PostSkillPage(),
+                                  ),
+                                ),
                               ),
-                              reviewsBuilder: () => _ReviewsSection(uid: uid),
-                              activityBuilder: () => _ActivitySection(uid: uid),
+                              reviewsBuilder: () => const _ReviewsPlaceholder(),
+                              activityBuilder: () => const _ActivityPlaceholder(),
                             ),
-
                             if (bio.isNotEmpty) ...[
                               const SizedBox(height: 16),
                               _AboutCard(bio: bio),
@@ -247,8 +167,11 @@ class _HeaderBanner extends StatelessWidget {
     required this.joinedLabel,
     required this.verified,
     required this.topRated,
-    required this.onEdit,
-    required this.onSettings,
+    this.swapCredits = 0,
+    this.swapsCompleted = 0,
+    this.isOwnProfile = true,
+    this.onEdit,
+    this.onSettings,
   });
 
   final String name;
@@ -259,8 +182,11 @@ class _HeaderBanner extends StatelessWidget {
   final String joinedLabel;
   final bool verified;
   final bool topRated;
-  final VoidCallback onEdit;
-  final VoidCallback onSettings;
+  final int swapCredits;
+  final int swapsCompleted;
+  final bool isOwnProfile;
+  final VoidCallback? onEdit;
+  final VoidCallback? onSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -323,6 +249,18 @@ class _HeaderBanner extends StatelessWidget {
                                     label: 'Top Rated',
                                     fg: const Color(0xFFF59E0B),
                                   ),
+                                if (swapCredits > 0)
+                                  _pill(
+                                    icon: Icons.verified_outlined,
+                                    label: '$swapCredits Credits',
+                                    fg: const Color(0xFF22C55E),
+                                  ),
+                                if (swapsCompleted > 0)
+                                  _pill(
+                                    icon: Icons.swap_horiz,
+                                    label: '$swapsCompleted Swap${swapsCompleted == 1 ? '' : 's'}',
+                                    fg: const Color(0xFF7C3AED),
+                                  ),
                               ],
                             ),
                             const SizedBox(height: 6),
@@ -350,21 +288,22 @@ class _HeaderBanner extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 10),
-                      Wrap(
-                        spacing: 10,
-                        children: [
-                          _DarkChipButton(
-                            icon: Icons.edit_outlined,
-                            label: 'Edit Profile',
-                            onPressed: onEdit,
-                          ),
-                          _DarkChipButton(
-                            icon: Icons.settings_outlined,
-                            label: 'Settings',
-                            onPressed: onSettings,
-                          ),
-                        ],
-                      ),
+                      if (isOwnProfile && onEdit != null && onSettings != null)
+                        Wrap(
+                          spacing: 10,
+                          children: [
+                            _DarkChipButton(
+                              icon: Icons.edit_outlined,
+                              label: 'Edit Profile',
+                              onPressed: onEdit!,
+                            ),
+                            _DarkChipButton(
+                              icon: Icons.settings_outlined,
+                              label: 'Settings',
+                              onPressed: onSettings!,
+                            ),
+                          ],
+                        ),
                     ],
                   ),
                 ),
@@ -427,16 +366,7 @@ class _HeaderBanner extends StatelessWidget {
 
   static Future<String?> _resolvePhotoUrl(String? raw) async {
     if (raw == null || raw.isEmpty) return null;
-    if (raw.startsWith('gs://')) {
-      try {
-        return await storage.FirebaseStorage.instance
-            .refFromURL(raw)
-            .getDownloadURL();
-      } catch (_) {
-        return null;
-      }
-    }
-    return raw; // already an https URL
+    return raw; // https URL stored in Cosmos DB
   }
 
   static Widget _pill({
@@ -687,14 +617,18 @@ class _SegmentedTabsState extends State<_SegmentedTabs> {
 
 class _SkillsSection extends StatefulWidget {
   const _SkillsSection({
+    required this.uid,
+    required this.isOwnProfile,
     required this.skillsToOffer,
     required this.servicesNeeded,
     required this.onPostFirst,
     required this.uid,
   });
 
-  final List<Map<String, dynamic>> skillsToOffer;
-  final List<Map<String, dynamic>> servicesNeeded;
+  final String uid;
+  final bool isOwnProfile;
+  final String skillsToOffer;
+  final String servicesNeeded;
   final VoidCallback onPostFirst;
   final String uid;
 
@@ -737,124 +671,200 @@ class _SkillsSectionState extends State<_SkillsSection> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final hasProfileSkills = widget.skillsToOffer.isNotEmpty;
-    final hasPostedSkills = _postedSkills.isNotEmpty;
+  State<_SkillsSection> createState() => _SkillsSectionState();
+}
 
-    if (!hasProfileSkills && !hasPostedSkills && !_loading) {
-      return _EmptySkills(onPostFirst: widget.onPostFirst);
+class _SkillsSectionState extends State<_SkillsSection> {
+  List<Skill>? _skills;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSkills();
+  }
+
+  Future<void> _loadSkills() async {
+    try {
+      final skills = await SkillService().getSkillsByUser(widget.uid);
+      if (mounted) setState(() { _skills = skills; _loading = false; });
+    } catch (e) {
+      debugPrint('Error loading skills: $e');
+      if (mounted) setState(() => _loading = false);
     }
+  }
+
+  Future<void> _deleteSkill(Skill skill) async {
+    try {
+      await SkillService().deleteSkill(skill.id, widget.uid);
+      if (mounted) _loadSkills();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to delete: $e')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(child: Padding(
+        padding: EdgeInsets.all(24),
+        child: CircularProgressIndicator(),
+      ));
+    }
+
+    final skills = _skills ?? [];
+    if (skills.isEmpty) return _EmptySkills(onPostFirst: widget.onPostFirst);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Posted Skills (from skills collection)
-        if (_loading)
-          const Center(child: CircularProgressIndicator())
-        else if (_postedSkills.isNotEmpty) ...[
-          _SectionCard(
-            title: 'Posted Skills (${_postedSkills.length})',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: _postedSkills.map((skill) {
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: HomePage.surfaceAlt,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: HomePage.line),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        skill['title'] ?? 'Untitled',
-                        style: const TextStyle(
-                          color: HomePage.textPrimary,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        skill['description'] ?? '',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: HomePage.textMuted,
-                          fontSize: 13,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 8,
-                        children: [
-                          _smallChip(skill['category'] ?? 'other'),
-                          _smallChip(skill['difficulty'] ?? ''),
-                          _smallChip('${skill['estimatedHours'] ?? 1}h'),
-                        ],
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ),
+        for (final skill in skills) ...[
+          _SkillCardItem(
+            skill: skill,
+            showDelete: widget.isOwnProfile,
+            onDelete: () => _deleteSkill(skill),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
         ],
-
-        // Profile Skills (from onboarding)
-        if (widget.skillsToOffer.isNotEmpty) ...[
+        if (widget.servicesNeeded.trim().isNotEmpty) ...[
+          const SizedBox(height: 4),
           _SectionCard(
-            title: 'Skills I Offer',
-            child: Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: widget.skillsToOffer
-                  .map(
-                    (e) =>
-                        _chip('${e['name']} • ${e['category']} • ${e['level']}'),
-                  )
-                  .toList(),
-            ),
+            title: 'Services I Need',
+            child: Text(widget.servicesNeeded,
+                style: const TextStyle(color: HomePage.textPrimary)),
           ),
-          const SizedBox(height: 12),
         ],
-
-        // Services Needed
-        _SectionCard(
-          title: 'Services I Need',
-          child: widget.servicesNeeded.isEmpty
-              ? const Text(
-                  'Nothing added yet.',
-                  style: TextStyle(color: HomePage.textMuted),
-                )
-              : Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: widget.servicesNeeded
-                      .map(
-                        (e) => _chip(
-                          '${e['name']} • ${e['category']} • ${e['level']}',
-                        ),
-                      )
-                      .toList(),
-                ),
-        ),
       ],
     );
   }
+}
 
-  static Widget _chip(String text) {
+class _SkillCardItem extends StatelessWidget {
+  const _SkillCardItem({
+    required this.skill,
+    this.showDelete = false,
+    this.onDelete,
+  });
+  final Skill skill;
+  final bool showDelete;
+  final VoidCallback? onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      color: HomePage.surface,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: HomePage.line),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    skill.title,
+                    style: const TextStyle(
+                      color: HomePage.textPrimary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+                _badge(skill.category, HomePage.accent),
+                const SizedBox(width: 6),
+                _badge(skill.difficulty, const Color(0xFFF59E0B)),
+                if (showDelete) ...[
+                  const SizedBox(width: 8),
+                  InkWell(
+                    onTap: onDelete,
+                    borderRadius: BorderRadius.circular(8),
+                    child: const Padding(
+                      padding: EdgeInsets.all(4),
+                      child: Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            if (skill.description.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                skill.description,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: HomePage.textMuted, fontSize: 13),
+              ),
+            ],
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                _infoPill(Icons.schedule, '${skill.estimatedHours.toStringAsFixed(skill.estimatedHours == skill.estimatedHours.roundToDouble() ? 0 : 1)}h'),
+                const SizedBox(width: 8),
+                _infoPill(Icons.location_on_outlined, skill.delivery),
+              ],
+            ),
+            if (skill.tags.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: skill.tags.map((t) => Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: HomePage.surfaceAlt,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: HomePage.line),
+                  ),
+                  child: Text(t, style: const TextStyle(color: HomePage.textPrimary, fontSize: 11)),
+                )).toList(),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  static Widget _badge(String text, Color color) {
     return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600),
+      ),
+    );
+  }
+
+  static Widget _infoPill(IconData icon, String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: HomePage.surfaceAlt,
+        borderRadius: BorderRadius.circular(6),
         border: Border.all(color: HomePage.line),
-        borderRadius: BorderRadius.circular(999),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      child: Text(text, style: const TextStyle(color: HomePage.textPrimary)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: HomePage.textMuted),
+          const SizedBox(width: 4),
+          Text(text, style: const TextStyle(color: HomePage.textMuted, fontSize: 11)),
+        ],
+      ),
     );
   }
 
@@ -951,7 +961,7 @@ class _EmptyProfileCard extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               const Text(
-                'Let’s set up your profile',
+                "Let's set up your profile",
                 style: TextStyle(
                   color: HomePage.textPrimary,
                   fontWeight: FontWeight.w700,
@@ -960,7 +970,7 @@ class _EmptyProfileCard extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               const Text(
-                'We’ll use your details to personalize your page.',
+                "We'll use your details to personalize your page.",
                 style: TextStyle(color: HomePage.textMuted),
               ),
               const SizedBox(height: 12),
@@ -1431,14 +1441,9 @@ class _AuthGuard extends StatelessWidget {
 /* ----------------------------- Utilities ----------------------------- */
 
 DateTime? _parseJoinedAt(dynamic v) {
-  try {
-    if (v == null) return null;
-    if (v is Timestamp) return v.toDate();
-    if (v is String) return DateTime.tryParse(v);
-    return null;
-  } catch (_) {
-    return null;
-  }
+  if (v == null) return null;
+  if (v is String) return DateTime.tryParse(v);
+  return null;
 }
 
 String _formatMonthYear(DateTime d) {

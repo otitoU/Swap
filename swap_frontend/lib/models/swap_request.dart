@@ -1,132 +1,6 @@
 /// Models for swap requests.
 
-enum SwapRequestStatus {
-  pending,
-  accepted,
-  declined,
-  cancelled,
-  pendingCompletion,
-  disputed,
-  completed,
-}
-
-enum SkillLevel { beginner, intermediate, advanced }
-
-/// Type of swap exchange.
-enum SwapType {
-  direct,   // Both users exchange skills
-  indirect, // Requester pays points, provider teaches
-}
-
-extension SwapTypeExtension on SwapType {
-  String get displayName {
-    switch (this) {
-      case SwapType.direct:
-        return 'Skill Exchange';
-      case SwapType.indirect:
-        return 'Points Based';
-    }
-  }
-  
-  String get description {
-    switch (this) {
-      case SwapType.direct:
-        return 'Exchange skills with each other';
-      case SwapType.indirect:
-        return 'Pay with points for this service';
-    }
-  }
-}
-
-/// Completion data for one participant.
-class ParticipantCompletion {
-  final bool markedComplete;
-  final DateTime? markedAt;
-  final double? hoursClaimed;
-  final SkillLevel? skillLevel;
-  final String? notes;
-
-  ParticipantCompletion({
-    this.markedComplete = false,
-    this.markedAt,
-    this.hoursClaimed,
-    this.skillLevel,
-    this.notes,
-  });
-
-  factory ParticipantCompletion.fromJson(Map<String, dynamic> json) =>
-      ParticipantCompletion(
-        markedComplete: json['marked_complete'] as bool? ?? false,
-        markedAt: json['marked_at'] != null
-            ? DateTime.parse(json['marked_at'] as String)
-            : null,
-        hoursClaimed: (json['hours_claimed'] as num?)?.toDouble(),
-        skillLevel: _parseSkillLevel(json['skill_level'] as String?),
-        notes: json['notes'] as String?,
-      );
-
-  static SkillLevel? _parseSkillLevel(String? level) {
-    switch (level) {
-      case 'beginner':
-        return SkillLevel.beginner;
-      case 'intermediate':
-        return SkillLevel.intermediate;
-      case 'advanced':
-        return SkillLevel.advanced;
-      default:
-        return null;
-    }
-  }
-}
-
-/// Full completion status for a swap.
-class SwapCompletionData {
-  final ParticipantCompletion requester;
-  final ParticipantCompletion recipient;
-  final DateTime? autoCompleteAt;
-  final DateTime? completedAt;
-  final double? finalHours;
-  // Earnings on completion
-  final int? requesterPointsEarned;
-  final int? requesterCreditsEarned;
-  final int? recipientPointsEarned;
-  final int? recipientCreditsEarned;
-
-  SwapCompletionData({
-    required this.requester,
-    required this.recipient,
-    this.autoCompleteAt,
-    this.completedAt,
-    this.finalHours,
-    this.requesterPointsEarned,
-    this.requesterCreditsEarned,
-    this.recipientPointsEarned,
-    this.recipientCreditsEarned,
-  });
-
-  factory SwapCompletionData.fromJson(Map<String, dynamic> json) =>
-      SwapCompletionData(
-        requester: json['requester'] != null
-            ? ParticipantCompletion.fromJson(
-                json['requester'] as Map<String, dynamic>)
-            : ParticipantCompletion(),
-        recipient: json['recipient'] != null
-            ? ParticipantCompletion.fromJson(
-                json['recipient'] as Map<String, dynamic>)
-            : ParticipantCompletion(),
-        autoCompleteAt: json['auto_complete_at'] != null
-            ? DateTime.parse(json['auto_complete_at'] as String)
-            : null,
-        completedAt: json['completed_at'] != null
-            ? DateTime.parse(json['completed_at'] as String)
-            : null,
-        finalHours: (json['final_hours'] as num?)?.toDouble(),
-        requesterPointsEarned: json['requester_points_earned'] as int?,
-        requesterCreditsEarned: json['requester_credits_earned'] as int?,
-        recipientPointsEarned: json['recipient_points_earned'] as int?,
-        recipientCreditsEarned: json['recipient_credits_earned'] as int?,
-      );
-}
+enum SwapRequestStatus { pending, accepted, declined, cancelled, completed }
 
 /// Minimal profile info for swap request participants.
 class SwapParticipant {
@@ -175,7 +49,10 @@ class SwapRequest {
   final String? conversationId;
   final SwapParticipant? requesterProfile;
   final SwapParticipant? recipientProfile;
-  final SwapCompletionData? completion;
+  final bool requesterConfirmed;
+  final bool recipientConfirmed;
+  final String? requesterOfferSkillId;
+  final String? requesterNeedSkillId;
 
   SwapRequest({
     required this.id,
@@ -194,7 +71,10 @@ class SwapRequest {
     this.conversationId,
     this.requesterProfile,
     this.recipientProfile,
-    this.completion,
+    this.requesterConfirmed = false,
+    this.recipientConfirmed = false,
+    this.requesterOfferSkillId,
+    this.requesterNeedSkillId,
   });
 
   factory SwapRequest.fromJson(Map<String, dynamic> json) => SwapRequest(
@@ -226,10 +106,10 @@ class SwapRequest {
             ? SwapParticipant.fromJson(
                 json['recipient_profile'] as Map<String, dynamic>)
             : null,
-        completion: json['completion'] != null
-            ? SwapCompletionData.fromJson(
-                json['completion'] as Map<String, dynamic>)
-            : null,
+        requesterConfirmed: json['requester_confirmed'] as bool? ?? false,
+        recipientConfirmed: json['recipient_confirmed'] as bool? ?? false,
+        requesterOfferSkillId: json['requester_offer_skill_id'] as String?,
+        requesterNeedSkillId: json['requester_need_skill_id'] as String?,
       );
 
   static SwapRequestStatus _parseStatus(String? status) {
@@ -240,10 +120,6 @@ class SwapRequest {
         return SwapRequestStatus.declined;
       case 'cancelled':
         return SwapRequestStatus.cancelled;
-      case 'pending_completion':
-        return SwapRequestStatus.pendingCompletion;
-      case 'disputed':
-        return SwapRequestStatus.disputed;
       case 'completed':
         return SwapRequestStatus.completed;
       default:
@@ -275,6 +151,10 @@ class SwapRequest {
         'updated_at': updatedAt.toIso8601String(),
         'responded_at': respondedAt?.toIso8601String(),
         'conversation_id': conversationId,
+        'requester_confirmed': requesterConfirmed,
+        'recipient_confirmed': recipientConfirmed,
+        'requester_offer_skill_id': requesterOfferSkillId,
+        'requester_need_skill_id': requesterNeedSkillId,
       };
 
   /// Whether this is a direct skill exchange.
@@ -295,18 +175,6 @@ class SwapRequest {
   /// Whether this request was cancelled.
   bool get isCancelled => status == SwapRequestStatus.cancelled;
 
-  /// Whether this request is awaiting completion verification.
-  bool get isPendingCompletion => status == SwapRequestStatus.pendingCompletion;
-
-  /// Whether this request is disputed.
-  bool get isDisputed => status == SwapRequestStatus.disputed;
-
-  /// Whether this request is fully completed.
+  /// Whether this swap is completed.
   bool get isCompleted => status == SwapRequestStatus.completed;
-
-  /// Whether the swap is in an active state (accepted but not completed).
-  bool get isActive => isAccepted || isPendingCompletion;
-
-  /// Whether the swap can be marked complete.
-  bool get canMarkComplete => isAccepted;
 }

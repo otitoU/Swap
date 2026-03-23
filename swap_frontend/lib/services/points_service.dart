@@ -1,188 +1,103 @@
 import 'dart:convert';
-
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 
-import '../config/app_config.dart';
+import '../config.dart';
 import '../models/points.dart';
+import 'b2c_auth_service.dart';
 
-/// Service for points API calls.
 class PointsService {
   final String baseUrl;
-
   PointsService({String? baseUrl}) : baseUrl = baseUrl ?? AppConfig.apiBaseUrl;
 
-  /// Get authorization headers if user is signed in.
-  Future<Map<String, String>> _getHeaders() async {
+  Future<Map<String, String>> _headers() async {
     final headers = <String, String>{
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     };
-
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null && !kIsWeb) {
-        final idToken = await user.getIdToken();
-        if (idToken != null) {
-          headers['Authorization'] = 'Bearer $idToken';
-        }
-      }
-    } catch (_) {
-      // Ignore token errors
+    if (!kIsWeb) {
+      try {
+        final token = await B2CAuthService.instance.getAccessToken();
+        if (token != null) headers['Authorization'] = 'Bearer $token';
+      } catch (_) {}
     }
-
     return headers;
   }
 
-  /// Get user's current points balance.
-  Future<PointsBalanceResponse> getBalance(
-    String uid, {
-    bool includeTransactions = true,
-    int transactionLimit = 10,
-  }) async {
-    final uri = Uri.parse('$baseUrl/points/balance/$uid').replace(
-      queryParameters: {
-        'include_transactions': includeTransactions.toString(),
-        'transaction_limit': transactionLimit.toString(),
-      },
-    );
-
-    debugPrint('PointsService: GET $uri');
-
-    final headers = await _getHeaders();
-    final response = await http.get(uri, headers: headers).timeout(
-          const Duration(seconds: 15),
-        );
-
-    if (response.statusCode != 200) {
-      throw Exception(
-          'Failed to get points balance: ${response.statusCode} ${response.reasonPhrase}');
+  /// Get current points + credits balance.
+  Future<PointsBalance> getBalance(String uid) async {
+    final uri = Uri.parse('$baseUrl/points/balance?uid=$uid');
+    final resp = await http
+        .get(uri, headers: await _headers())
+        .timeout(const Duration(seconds: 8));
+    if (resp.statusCode != 200) {
+      throw Exception('Failed to get balance: ${resp.statusCode}');
     }
-
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
-    return PointsBalanceResponse.fromJson(data);
+    return PointsBalance.fromJson(
+        jsonDecode(resp.body) as Map<String, dynamic>);
   }
 
-  /// Get points transaction history.
-  Future<Map<String, dynamic>> getTransactionHistory(
-    String uid, {
-    int limit = 20,
-    int offset = 0,
-    String? typeFilter,
+  /// Get transaction history.
+  Future<List<PointsTransaction>> getHistory(String uid,
+      {int limit = 50}) async {
+    final uri = Uri.parse('$baseUrl/points/history?uid=$uid&limit=$limit');
+    final resp = await http
+        .get(uri, headers: await _headers())
+        .timeout(const Duration(seconds: 8));
+    if (resp.statusCode != 200) {
+      throw Exception('Failed to get history: ${resp.statusCode}');
+    }
+    final data = jsonDecode(resp.body) as List;
+    return data
+        .map((e) => PointsTransaction.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Complete a swap and earn points/credits.
+  Future<PointsBalance> completeSwap({
+    required String uid,
+    required String requestId,
+    required double hours,
+    required String skillLevel,
+    String? notes,
   }) async {
-    final queryParams = <String, String>{
-      'limit': limit.toString(),
-      'offset': offset.toString(),
-    };
-    if (typeFilter != null) {
-      queryParams['type_filter'] = typeFilter;
-    }
-
-    final uri = Uri.parse('$baseUrl/points/transactions/$uid')
-        .replace(queryParameters: queryParams);
-
-    debugPrint('PointsService: GET $uri');
-
-    final headers = await _getHeaders();
-    final response = await http.get(uri, headers: headers).timeout(
-          const Duration(seconds: 15),
-        );
-
-    if (response.statusCode != 200) {
+    final uri = Uri.parse(
+        '$baseUrl/points/complete-swap/$requestId?uid=$uid');
+    final body = jsonEncode(<String, dynamic>{
+      'hours': hours,
+      'skill_level': skillLevel,
+      if (notes != null && notes.isNotEmpty) 'notes': notes,
+    });
+    final resp = await http
+        .post(uri, headers: await _headers(), body: body)
+        .timeout(const Duration(seconds: 10));
+    if (resp.statusCode != 200) {
       throw Exception(
-          'Failed to get transaction history: ${response.statusCode} ${response.reasonPhrase}');
+          'Failed to complete swap: ${resp.statusCode} ${resp.body}');
     }
-
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
-    return {
-      'transactions': (data['transactions'] as List<dynamic>?)
-              ?.map(
-                  (e) => PointsTransaction.fromJson(e as Map<String, dynamic>))
-              .toList() ??
-          [],
-      'total': data['total'] as int? ?? 0,
-      'limit': data['limit'] as int? ?? limit,
-      'offset': data['offset'] as int? ?? offset,
-      'has_more': data['has_more'] as bool? ?? false,
-    };
+    return PointsBalance.fromJson(
+        jsonDecode(resp.body) as Map<String, dynamic>);
   }
 
   /// Spend points on platform features.
-  Future<Map<String, dynamic>> spendPoints({
+  Future<PointsTransaction> spendPoints({
     required String uid,
     required String reason,
     int? durationHours,
   }) async {
-    final uri = Uri.parse('$baseUrl/points/spend')
-        .replace(queryParameters: {'uid': uid});
-
-    debugPrint('PointsService: POST $uri (reason: $reason)');
-
-    final headers = await _getHeaders();
-    final body = jsonEncode({
+    final uri = Uri.parse('$baseUrl/points/spend?uid=$uid');
+    final body = jsonEncode(<String, dynamic>{
       'reason': reason,
       if (durationHours != null) 'duration_hours': durationHours,
     });
-
-    final response = await http
-        .post(uri, headers: headers, body: body)
-        .timeout(const Duration(seconds: 15));
-
-    if (response.statusCode != 200) {
-      final errorBody = response.body;
-      throw Exception('Failed to spend points: ${response.statusCode} $errorBody');
-    }
-
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
-    return {
-      'success': data['success'] as bool? ?? false,
-      'new_balance': data['new_balance'] as int? ?? 0,
-      'transaction_id': data['transaction_id'] as String?,
-      'message': data['message'] as String?,
-    };
-  }
-
-  /// Purchase a priority boost.
-  Future<Map<String, dynamic>> purchasePriorityBoost(
-      String uid, int durationHours) async {
-    return spendPoints(
-      uid: uid,
-      reason: 'priority_boost',
-      durationHours: durationHours,
-    );
-  }
-
-  /// Purchase the ability to request help without reciprocity.
-  Future<Map<String, dynamic>> purchaseRequestWithoutReciprocity(
-      String uid) async {
-    return spendPoints(uid: uid, reason: 'request_without_reciprocity');
-  }
-
-  /// Get active priority boosts for a user.
-  Future<Map<String, dynamic>> getActiveBoosts(String uid) async {
-    final uri = Uri.parse('$baseUrl/points/active-boosts/$uid');
-
-    debugPrint('PointsService: GET $uri');
-
-    final headers = await _getHeaders();
-    final response = await http.get(uri, headers: headers).timeout(
-          const Duration(seconds: 15),
-        );
-
-    if (response.statusCode != 200) {
+    final resp = await http
+        .post(uri, headers: await _headers(), body: body)
+        .timeout(const Duration(seconds: 10));
+    if (resp.statusCode != 200) {
       throw Exception(
-          'Failed to get active boosts: ${response.statusCode} ${response.reasonPhrase}');
+          'Failed to spend points: ${resp.statusCode} ${resp.body}');
     }
-
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
-    return {
-      'uid': data['uid'] as String?,
-      'active_boosts': (data['active_boosts'] as List<dynamic>?)
-              ?.map((e) => ActiveBoost.fromJson(e as Map<String, dynamic>))
-              .toList() ??
-          [],
-      'has_active_boost': data['has_active_boost'] as bool? ?? false,
-    };
+    return PointsTransaction.fromJson(
+        jsonDecode(resp.body) as Map<String, dynamic>);
   }
 }

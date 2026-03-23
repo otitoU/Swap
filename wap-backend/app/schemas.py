@@ -9,9 +9,9 @@ from pydantic import BaseModel, Field
 class ProfileBase(BaseModel):
     """Base profile fields - matches Flutter AppUser model."""
     
-    # Firebase Auth fields
-    uid: str = Field(..., description="Firebase Auth UID")
-    email: str = Field(..., description="User email")
+    # Auth fields
+    uid: str = Field(..., description="User UID (Azure AD B2C object ID)")
+    email: EmailStr = Field(..., description="User email")
     display_name: Optional[str] = Field(None, description="Display name")
     photo_url: Optional[str] = Field(None, description="Profile photo URL")
     
@@ -66,7 +66,7 @@ class ProfileResponse(ProfileBase):
         from_attributes = True
         json_schema_extra = {
             "example": {
-                "uid": "firebase_user_123",
+                "uid": "b2c_user_abc123",
                 "email": "alice@example.com",
                 "display_name": "Alice Smith",
                 "photo_url": "https://example.com/photo.jpg",
@@ -102,6 +102,8 @@ class ProfileSearchResult(BaseModel):
     services_needed: Optional[str]
     dm_open: Optional[bool]
     show_city: Optional[bool]
+    swap_credits: int = Field(0, description="Total swap credits earned (trust indicator)")
+    swaps_completed: int = Field(0, description="Number of completed swaps")
     score: float = Field(..., description="Similarity score (0-1)")
 
 
@@ -114,6 +116,57 @@ class ReciprocalMatchResult(ProfileSearchResult):
 
 
 # =============================================================================
+# Skill Schemas
+# =============================================================================
+
+class SkillCreate(BaseModel):
+    """Schema for creating a skill."""
+    title: str = Field(..., min_length=1, max_length=200, description="Skill title")
+    description: str = Field(..., min_length=1, max_length=2000, description="Skill description")
+    category: str = Field(..., description="Skill category")
+    difficulty: str = Field(..., description="Skill difficulty level")
+    estimated_hours: float = Field(1, gt=0, le=100, description="Estimated hours")
+    delivery: str = Field("Remote Only", description="Delivery method")
+    tags: List[str] = Field(default_factory=list, description="Tags")
+    deliverables: List[str] = Field(default_factory=list, description="Deliverables")
+
+
+class SkillResponse(BaseModel):
+    """Schema for skill responses."""
+    id: str
+    posted_by: str
+    title: str
+    description: str
+    category: str
+    difficulty: str
+    estimated_hours: float = 1
+    delivery: str = "Remote Only"
+    tags: List[str] = Field(default_factory=list)
+    deliverables: List[str] = Field(default_factory=list)
+    created_at: datetime
+    updated_at: datetime
+
+
+class SkillSearchResult(BaseModel):
+    """Schema for skill search results."""
+    id: str
+    skill_id: str
+    posted_by: str
+    title: str
+    description: str = ""
+    category: str = ""
+    difficulty: str = ""
+    estimated_hours: float = 1
+    delivery: str = "Remote Only"
+    tags: List[str] = Field(default_factory=list)
+    deliverables: List[str] = Field(default_factory=list)
+    poster_name: str = ""
+    poster_city: str = ""
+    poster_swap_credits: int = 0
+    score: float = 0.0
+
+
+# =============================================================================
 # Swap Request Schemas
 # =============================================================================
 
@@ -123,23 +176,7 @@ class SwapRequestStatus(str, Enum):
     accepted = "accepted"
     declined = "declined"
     cancelled = "cancelled"
-    # Completion states
-    pending_completion = "pending_completion"  # One party marked complete
-    disputed = "disputed"                       # Dispute raised
-    completed = "completed"                     # Finalized
-
-
-class SkillLevel(str, Enum):
-    """Skill level for points calculation."""
-    beginner = "beginner"
-    intermediate = "intermediate"
-    advanced = "advanced"
-
-
-class SwapType(str, Enum):
-    """Type of swap exchange."""
-    direct = "direct"      # Both users exchange skills
-    indirect = "indirect"  # Requester pays points, provider teaches
+    completed = "completed"
 
 
 class SwapRequestCreate(BaseModel):
@@ -149,8 +186,8 @@ class SwapRequestCreate(BaseModel):
     requester_offer: Optional[str] = Field(None, description="What you're offering in the swap (required for direct)")
     requester_need: str = Field(..., description="What you need from them")
     message: Optional[str] = Field(None, max_length=500, description="Optional intro message")
-    swap_type: SwapType = Field(SwapType.direct, description="Type of swap: direct (skill exchange) or indirect (pay with points)")
-    points_offered: Optional[int] = Field(None, ge=1, description="Points offered for indirect swap (required if indirect)")
+    requester_offer_skill_id: Optional[str] = Field(None, description="ID of the skill being offered")
+    requester_need_skill_id: Optional[str] = Field(None, description="ID of the skill being requested")
 
 
 class SwapRequestAction(BaseModel):
@@ -189,7 +226,10 @@ class SwapRequestResponse(BaseModel):
     conversation_id: Optional[str] = None
     requester_profile: Optional[SwapParticipant] = None
     recipient_profile: Optional[SwapParticipant] = None
-    completion: Optional[dict] = None  # Completion data (dynamic)
+    requester_confirmed: bool = False
+    recipient_confirmed: bool = False
+    requester_offer_skill_id: Optional[str] = None
+    requester_need_skill_id: Optional[str] = None
 
 
 # =============================================================================
@@ -316,105 +356,6 @@ class ReportResponse(BaseModel):
 
 
 # =============================================================================
-# Swap Completion Schemas
-# =============================================================================
-
-class SwapCompletionCreate(BaseModel):
-    """Schema for marking a swap as complete."""
-
-    hours_exchanged: float = Field(..., ge=0.5, le=100, description="Hours spent in exchange")
-    skill_level: SkillLevel = Field(..., description="Level of skill exchanged")
-    notes: Optional[str] = Field(None, max_length=500, description="Optional completion notes")
-
-
-class SwapCompletionVerify(BaseModel):
-    """Schema for verifying or disputing a completion."""
-
-    action: Literal["verify", "dispute"] = Field(..., description="Verify or dispute the completion")
-    dispute_reason: Optional[str] = Field(None, max_length=500, description="Reason for dispute (required if disputing)")
-
-
-class ParticipantCompletion(BaseModel):
-    """Tracks completion state for one participant."""
-
-    marked_complete: bool = False
-    marked_at: Optional[datetime] = None
-    hours_claimed: Optional[float] = None
-    skill_level: Optional[SkillLevel] = None
-    notes: Optional[str] = None
-
-
-class SwapCompletionResponse(BaseModel):
-    """Completion data for SwapRequestResponse - matches frontend expectations."""
-
-    requester: Optional[ParticipantCompletion] = None
-    recipient: Optional[ParticipantCompletion] = None
-    auto_complete_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
-    final_hours: Optional[float] = None
-    requester_points_earned: Optional[int] = None
-    requester_credits_earned: Optional[int] = None
-    recipient_points_earned: Optional[int] = None
-    recipient_credits_earned: Optional[int] = None
-
-
-class SwapCompletionStatus(BaseModel):
-    """Current completion status for a swap."""
-
-    swap_request_id: str
-    status: SwapRequestStatus
-    swap_type: SwapType = SwapType.direct
-    requester_completion: Optional[ParticipantCompletion] = None
-    recipient_completion: Optional[ParticipantCompletion] = None
-    auto_complete_at: Optional[datetime] = None  # When auto-completion will trigger
-    completed_at: Optional[datetime] = None
-    final_hours: Optional[float] = None  # Agreed hours after verification
-    # Earnings awarded on completion
-    requester_points_earned: Optional[int] = None
-    requester_credits_earned: Optional[int] = None
-    recipient_points_earned: Optional[int] = None
-    recipient_credits_earned: Optional[int] = None
-
-
-# =============================================================================
-# Reviews Schemas
-# =============================================================================
-
-class ReviewCreate(BaseModel):
-    """Schema for submitting a review after swap completion."""
-
-    swap_request_id: str = Field(..., description="ID of the completed swap")
-    rating: int = Field(..., ge=1, le=5, description="Star rating (1-5)")
-    review_text: Optional[str] = Field(None, max_length=1000, description="Optional review text")
-
-
-class ReviewResponse(BaseModel):
-    """Schema for review responses."""
-
-    id: str
-    swap_request_id: str
-    reviewer_uid: str
-    reviewed_uid: str
-    rating: int
-    review_text: Optional[str] = None
-    skill_exchanged: Optional[str] = None
-    hours_exchanged: Optional[float] = None
-    created_at: datetime
-
-    # Enriched reviewer info
-    reviewer_name: Optional[str] = None
-    reviewer_photo: Optional[str] = None
-
-
-class ReviewListResponse(BaseModel):
-    """Paginated list of reviews."""
-
-    reviews: List[ReviewResponse]
-    total: int
-    average_rating: float
-
-
-# =============================================================================
 # Points & Credits Schemas
 # =============================================================================
 
@@ -429,104 +370,53 @@ class PointsTransactionReason(str, Enum):
     swap_completed = "swap_completed"
     priority_boost = "priority_boost"
     request_without_reciprocity = "request_without_reciprocity"
-    indirect_swap_payment = "indirect_swap_payment"  # Points paid for indirect swap
-    indirect_swap_reserved = "indirect_swap_reserved"  # Points held for pending indirect
-    indirect_swap_refund = "indirect_swap_refund"  # Points refunded if declined/cancelled
-    bonus = "bonus"  # For promotions, etc.
+    bonus = "bonus"
 
 
-class PointsTransaction(BaseModel):
+class SkillLevel(str, Enum):
+    """Skill difficulty level."""
+    beginner = "beginner"
+    intermediate = "intermediate"
+    advanced = "advanced"
+
+
+class SwapCompletionRequest(BaseModel):
+    """Schema for marking a swap as completed."""
+    hours: float = Field(..., gt=0, le=100, description="Hours spent on the swap")
+    skill_level: SkillLevel = Field(..., description="Difficulty level of the skill exchanged")
+    notes: Optional[str] = Field(None, max_length=500, description="Optional notes about the swap")
+
+
+class SwapConfirmRequest(BaseModel):
+    """Schema for confirming swap completion (mutual confirmation)."""
+    hours: float = Field(..., gt=0, le=100, description="Hours spent on the swap")
+    skill_level: SkillLevel = Field(..., description="Difficulty level of the skill exchanged")
+    notes: Optional[str] = Field(None, max_length=500, description="Optional notes about the swap")
+
+
+class PointsTransactionResponse(BaseModel):
     """Schema for a points transaction record."""
-
     id: str
     uid: str
     type: PointsTransactionType
-    amount: int
-    balance_after: int
     reason: PointsTransactionReason
-    related_swap_id: Optional[str] = None
-    related_skill: Optional[str] = None
+    points: int = 0
+    credits: int = 0
+    description: str = ""
+    swap_request_id: Optional[str] = None
     created_at: datetime
 
 
 class PointsBalanceResponse(BaseModel):
-    """Schema for points balance response."""
-
+    """Schema for user's current balance."""
     uid: str
-    swap_points: int
-    lifetime_points_earned: int
-    recent_transactions: List[PointsTransaction] = []
+    points: int = 0
+    credits: int = 0
+    total_swaps_completed: int = 0
 
 
 class PointsSpendRequest(BaseModel):
     """Schema for spending points."""
-
-    amount: int = Field(..., ge=1, description="Points to spend")
-    reason: Literal["priority_boost", "request_without_reciprocity"] = Field(..., description="What to spend on")
-    duration_hours: Optional[int] = Field(24, ge=1, le=168, description="Duration for boost (if applicable)")
-
-
-class PointsSpendResponse(BaseModel):
-    """Schema for spend confirmation."""
-
-    success: bool
-    new_balance: int
-    transaction_id: str
-    message: str
-
-
-# =============================================================================
-# Portfolio Schemas
-# =============================================================================
-
-class VerifiedSkill(BaseModel):
-    """A skill verified through completed swaps."""
-
-    skill_name: str
-    times_exchanged: int
-    total_hours: float
-    average_rating: float
-    last_used: Optional[datetime] = None
-
-
-class CompletedSwapSummary(BaseModel):
-    """Summary of a completed swap for portfolio."""
-
-    swap_request_id: str
-    partner_uid: str
-    partner_name: Optional[str] = None
-    partner_photo: Optional[str] = None
-    skill_taught: Optional[str] = None
-    skill_learned: Optional[str] = None
-    hours_exchanged: float
-    rating_given: Optional[int] = None
-    rating_received: Optional[int] = None
-    completed_at: datetime
-
-
-class PortfolioResponse(BaseModel):
-    """Comprehensive skill portfolio response."""
-
-    uid: str
-    display_name: Optional[str] = None
-    photo_url: Optional[str] = None
-
-    # Stats
-    swap_credits: int = 0
-    swap_points: int = 0
-    total_swaps_completed: int = 0
-    total_hours_traded: float = 0.0
-    average_rating: float = 0.0
-    review_count: int = 0
-
-    # Verified skills (from completed swaps)
-    verified_skills_taught: List[VerifiedSkill] = []
-    verified_skills_learned: List[VerifiedSkill] = []
-
-    # Recent activity
-    recent_swaps: List[CompletedSwapSummary] = []
-    recent_reviews: List[ReviewResponse] = []
-
-    # Member since
-    member_since: Optional[datetime] = None
+    reason: PointsTransactionReason
+    duration_hours: Optional[int] = Field(None, ge=1, le=168, description="Duration for priority boost")
 
