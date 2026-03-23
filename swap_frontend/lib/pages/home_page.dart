@@ -2,16 +2,13 @@ import 'package:flutter/material.dart';
 import 'landing_page.dart';
 import 'dart:async'; // for TimeoutException
 import '../services/search_service.dart';
-// import 'post_skill_page.dart'; // no longer used directly here
-import '../services/auth_service.dart';
+import '../services/b2c_auth_service.dart';
 import '../widgets/app_sidebar.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-// Removed debug-only imports (seed/upsert/test helpers)
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
-  // ---- Theme (same palette family you’ve been using)
+  // ---- Theme (same palette family you've been using)
   static const Color bg = Color(0xFF0A0A0B);
   static const Color sidebar = Color(0xFF0F1115);
   static const Color surface = Color(0xFF12141B);
@@ -218,42 +215,8 @@ class _DiscoverPaneState extends State<_DiscoverPane> {
   void initState() {
     super.initState();
     _searchCtrl = TextEditingController();
-    _loadSkillsFromFirestore();
-  }
-
-  Future<void> _loadSkillsFromFirestore() async {
-    try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('skills')
-          .get();
-
-      final loadedSkills = snapshot.docs.map((doc) {
-        final data = doc.data();
-        return _Skill(
-          title: data['title'] ?? '',
-          category: data['category'] ?? 'other',
-          description: data['description'] ?? '',
-          durationHours: data['estimatedHours'] ?? 1,
-          mode: data['deliveryFormat'] ?? 'Remote',
-          rating: (data['rating'] ?? 4.5).toDouble(),
-          tags: List<String>.from(data['tags'] ?? []),
-          verified: data['verified'] ?? false,
-          isNew: data['isNew'] ?? false,
-        );
-      }).toList();
-
-      if (mounted) {
-        setState(() {
-          skills = loadedSkills;
-          _loadingSkills = false;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error loading skills: $e');
-      if (mounted) {
-        setState(() => _loadingSkills = false);
-      }
-    }
+    // Skills are loaded from the API search; default grid is empty until searched
+    if (mounted) setState(() => _loadingSkills = false);
   }
 
   @override
@@ -913,7 +876,7 @@ class _TopBar extends StatelessWidget implements PreferredSizeWidget {
             tooltip: 'Sign out',
             icon: const Icon(Icons.logout),
             onPressed: () async {
-              await AuthService.instance.signOut();
+              await B2CAuthService.instance.signOut();
               if (!context.mounted) return;
               Navigator.of(context).pushAndRemoveUntil(
                 MaterialPageRoute(builder: (_) => const LandingPage()),

@@ -1,8 +1,7 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_storage/firebase_storage.dart' as storage;
 
+import '../services/b2c_auth_service.dart';
+import '../services/profile_service.dart';
 import '../widgets/app_sidebar.dart';
 import 'home_page.dart';
 import 'post_skill_page.dart';
@@ -15,7 +14,7 @@ class ProfilePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final uid = B2CAuthService.instance.currentUser?.uid;
     if (uid == null) return const _AuthGuard();
 
     return Scaffold(
@@ -26,59 +25,32 @@ class ProfilePage extends StatelessWidget {
           children: [
             const AppSidebar(active: 'Profile'),
             Expanded(
-              child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                stream: FirebaseFirestore.instance
-                    .collection('users')
-                    .doc(uid)
-                    .snapshots(),
+              child: FutureBuilder<Map<String, dynamic>?>(
+                future: ProfileService().getProfile(uid),
                 builder: (context, snap) {
                   if (snap.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
                   }
-                  if (!snap.hasData || !snap.data!.exists) {
+                  if (!snap.hasData || snap.data == null) {
                     return _EmptyProfileCard(
-                      onSetup: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const ProfileSetupFlow(),
-                          ),
-                        );
-                      },
+                      onSetup: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const ProfileSetupFlow(),
+                        ),
+                      ),
                     );
                   }
 
-                  final data = snap.data!.data()!;
-                  final name = (data['fullName'] ?? data['displayName'] ?? '')
-                      .toString()
-                      .trim();
+                  final data = snap.data!;
+                  final name = (data['full_name'] ?? data['display_name'] ?? '').toString().trim();
                   final username = (data['username'] ?? '').toString().trim();
                   final city = (data['city'] ?? '').toString().trim();
                   final bio = (data['bio'] ?? '').toString().trim();
-                  final photoUrl = data['photoUrl'] as String?;
+                  final photoUrl = data['photo_url'] as String?;
                   final timezone = (data['timezone'] ?? '').toString().trim();
-
-                  final verified = (data['verified'] ?? false) == true;
-                  final topRated = (data['topRated'] ?? false) == true;
-                  final joinedAt = _parseJoinedAt(data['joinedAt']);
-
-                  // Stats (fallbacks)
-                  final swapsCompleted = (data['swapsCompleted'] ?? 0) as int;
-                  final hoursTraded = (data['hoursTraded'] ?? 0) as int;
-                  final avgRating = (data['avgRating'] ?? 0).toDouble();
-                  final responseRate = ((data['responseRate'] ?? 0).toDouble())
-                      .clamp(0, 100);
-
-                  // Skills stored as arrays on the user doc
-                  final skillsToOffer =
-                      (data['skillsToOffer'] as List<dynamic>?)
-                          ?.cast<Map<String, dynamic>>() ??
-                      const [];
-                  final servicesNeeded =
-                      (data['servicesNeeded'] as List<dynamic>?)
-                          ?.cast<Map<String, dynamic>>() ??
-                      const [];
-                  final skillsCount = skillsToOffer.length;
-                  final reviewsCount = (data['reviewsCount'] ?? 0) as int;
+                  final skillsToOffer = (data['skills_to_offer'] ?? '').toString();
+                  final servicesNeeded = (data['services_needed'] ?? '').toString();
+                  final joinedAt = DateTime.tryParse(data['created_at'] ?? '');
 
                   return SingleChildScrollView(
                     padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
@@ -97,86 +69,36 @@ class ProfilePage extends StatelessWidget {
                               joinedLabel: joinedAt == null
                                   ? 'Joined recently'
                                   : 'Joined ${_formatMonthYear(joinedAt)}',
-                              verified: verified,
-                              topRated: topRated,
-                              onEdit: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => const ProfileSetupFlow(),
-                                  ),
-                                );
-                              },
+                              verified: false,
+                              topRated: false,
+                              onEdit: () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const ProfileSetupFlow(),
+                                ),
+                              ),
                               onSettings: () {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Settings coming soon'),
-                                  ),
+                                  const SnackBar(content: Text('Settings coming soon')),
                                 );
                               },
                             ),
-                            const SizedBox(height: 12),
-
-                            // Four compact stat tiles (dark)
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _StatCard(
-                                    icon: Icons.verified_user_outlined,
-                                    label: 'Swaps Completed',
-                                    value: swapsCompleted.toString(),
-                                  ),
-                                ),
-                                const SizedBox(width: _gutter),
-                                Expanded(
-                                  child: _StatCard(
-                                    icon: Icons.access_time,
-                                    label: 'Hours Traded',
-                                    value: '${hoursTraded}h',
-                                  ),
-                                ),
-                                const SizedBox(width: _gutter),
-                                Expanded(
-                                  child: _StatCard(
-                                    icon: Icons.star_rate_rounded,
-                                    label: 'Average Rating',
-                                    value: avgRating.toStringAsFixed(1),
-                                  ),
-                                ),
-                                const SizedBox(width: _gutter),
-                                Expanded(
-                                  child: _StatCard(
-                                    icon: Icons.trending_up_rounded,
-                                    label: 'Response Rate',
-                                    value:
-                                        '${responseRate.toStringAsFixed(0)}%',
-                                  ),
-                                ),
-                              ],
-                            ),
-
                             const SizedBox(height: 16),
-
-                            // Tabs: My Skills / Reviews / Activity
                             _SegmentedTabs(
-                              skillsLabel: 'My Skills ($skillsCount)',
-                              reviewsLabel: 'Reviews ($reviewsCount)',
+                              skillsLabel: 'My Skills',
+                              reviewsLabel: 'Reviews',
                               activityLabel: 'Activity',
                               skillsBuilder: () => _SkillsSection(
                                 skillsToOffer: skillsToOffer,
                                 servicesNeeded: servicesNeeded,
-                                onPostFirst: () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => const PostSkillPage(),
-                                    ),
-                                  );
-                                },
+                                onPostFirst: () => Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => const PostSkillPage(),
+                                  ),
+                                ),
                               ),
                               reviewsBuilder: () => const _ReviewsPlaceholder(),
-                              activityBuilder: () =>
-                                  const _ActivityPlaceholder(),
+                              activityBuilder: () => const _ActivityPlaceholder(),
                             ),
-
                             if (bio.isNotEmpty) ...[
                               const SizedBox(height: 16),
                               _AboutCard(bio: bio),
@@ -388,16 +310,7 @@ class _HeaderBanner extends StatelessWidget {
 
   static Future<String?> _resolvePhotoUrl(String? raw) async {
     if (raw == null || raw.isEmpty) return null;
-    if (raw.startsWith('gs://')) {
-      try {
-        return await storage.FirebaseStorage.instance
-            .refFromURL(raw)
-            .getDownloadURL();
-      } catch (_) {
-        return null;
-      }
-    }
-    return raw; // already an https URL
+    return raw; // https URL stored in Cosmos DB
   }
 
   static Widget _pill({
@@ -653,13 +566,13 @@ class _SkillsSection extends StatelessWidget {
     required this.onPostFirst,
   });
 
-  final List<Map<String, dynamic>> skillsToOffer;
-  final List<Map<String, dynamic>> servicesNeeded;
+  final String skillsToOffer;
+  final String servicesNeeded;
   final VoidCallback onPostFirst;
 
   @override
   Widget build(BuildContext context) {
-    final hasSkills = skillsToOffer.isNotEmpty;
+    final hasSkills = skillsToOffer.trim().isNotEmpty;
 
     if (!hasSkills) return _EmptySkills(onPostFirst: onPostFirst);
 
@@ -668,36 +581,14 @@ class _SkillsSection extends StatelessWidget {
       children: [
         _SectionCard(
           title: 'My Skills',
-          child: Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: skillsToOffer
-                .map(
-                  (e) =>
-                      _chip('${e['name']} • ${e['category']} • ${e['level']}'),
-                )
-                .toList(),
-          ),
+          child: Text(skillsToOffer, style: const TextStyle(color: HomePage.textPrimary)),
         ),
         const SizedBox(height: 12),
         _SectionCard(
           title: 'Services I Need',
-          child: servicesNeeded.isEmpty
-              ? const Text(
-                  'Nothing added yet.',
-                  style: TextStyle(color: HomePage.textMuted),
-                )
-              : Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: servicesNeeded
-                      .map(
-                        (e) => _chip(
-                          '${e['name']} • ${e['category']} • ${e['level']}',
-                        ),
-                      )
-                      .toList(),
-                ),
+          child: servicesNeeded.trim().isEmpty
+              ? const Text('Nothing added yet.', style: TextStyle(color: HomePage.textMuted))
+              : Text(servicesNeeded, style: const TextStyle(color: HomePage.textPrimary)),
         ),
       ],
     );
@@ -792,7 +683,7 @@ class _EmptyProfileCard extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               const Text(
-                'Let’s set up your profile',
+                "Let's set up your profile",
                 style: TextStyle(
                   color: HomePage.textPrimary,
                   fontWeight: FontWeight.w700,
@@ -801,7 +692,7 @@ class _EmptyProfileCard extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               const Text(
-                'We’ll use your details to personalize your page.',
+                "We'll use your details to personalize your page.",
                 style: TextStyle(color: HomePage.textMuted),
               ),
               const SizedBox(height: 12),
@@ -935,14 +826,9 @@ class _AuthGuard extends StatelessWidget {
 /* ----------------------------- Utilities ----------------------------- */
 
 DateTime? _parseJoinedAt(dynamic v) {
-  try {
-    if (v == null) return null;
-    if (v is Timestamp) return v.toDate();
-    if (v is String) return DateTime.tryParse(v);
-    return null;
-  } catch (_) {
-    return null;
-  }
+  if (v == null) return null;
+  if (v is String) return DateTime.tryParse(v);
+  return null;
 }
 
 String _formatMonthYear(DateTime d) {

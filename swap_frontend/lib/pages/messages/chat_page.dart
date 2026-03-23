@@ -1,9 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 import '../home_page.dart';
+import '../../services/b2c_auth_service.dart';
 import '../../models/conversation.dart';
 import '../../services/messaging_service.dart';
 import '../../widgets/message_bubble.dart';
@@ -30,7 +30,7 @@ class _ChatPageState extends State<ChatPage> {
   String? _error;
   Timer? _pollTimer;
 
-  String get _currentUid => FirebaseAuth.instance.currentUser!.uid;
+  String get _currentUid => B2CAuthService.instance.currentUser?.uid ?? '';
 
   String get _otherUid => widget.conversation.participantUids
       .firstWhere((uid) => uid != _currentUid, orElse: () => '');

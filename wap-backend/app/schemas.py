@@ -9,8 +9,8 @@ from pydantic import BaseModel, Field, EmailStr
 class ProfileBase(BaseModel):
     """Base profile fields - matches Flutter AppUser model."""
     
-    # Firebase Auth fields
-    uid: str = Field(..., description="Firebase Auth UID")
+    # Auth fields
+    uid: str = Field(..., description="User UID (Azure AD B2C object ID)")
     email: EmailStr = Field(..., description="User email")
     display_name: Optional[str] = Field(None, description="Display name")
     photo_url: Optional[str] = Field(None, description="Profile photo URL")
@@ -66,7 +66,7 @@ class ProfileResponse(ProfileBase):
         from_attributes = True
         json_schema_extra = {
             "example": {
-                "uid": "firebase_user_123",
+                "uid": "b2c_user_abc123",
                 "email": "alice@example.com",
                 "display_name": "Alice Smith",
                 "photo_url": "https://example.com/photo.jpg",

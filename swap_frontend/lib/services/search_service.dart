@@ -1,8 +1,10 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
+
+import '../config.dart';
+import 'b2c_auth_service.dart';
 
 /// Model for a single search hit returned by the backend /search endpoint.
 class SearchResult {
@@ -53,7 +55,7 @@ class SearchService {
   final String baseUrl;
 
   SearchService({String? baseUrl})
-    : baseUrl = baseUrl ?? 'http://localhost:8000';
+    : baseUrl = baseUrl ?? AppConfig.apiBaseUrl;
 
   /// Perform a semantic search.
   ///
@@ -69,22 +71,19 @@ class SearchService {
     final uri = Uri.parse('$baseUrl/search');
     final body = jsonEncode({'query': query, 'mode': mode, 'limit': limit});
 
-    // If the user is signed in, include an ID token in Authorization header.
-    String? idToken;
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) idToken = await user.getIdToken();
-    } catch (_) {
-      // ignore token errors; the endpoint may allow unauthenticated requests
-    }
-
     final headers = <String, String>{
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     };
     // Avoid CORS preflight on web by omitting Authorization there.
-    if (!kIsWeb && idToken != null)
-      headers['Authorization'] = 'Bearer $idToken';
+    if (!kIsWeb) {
+      try {
+        final token = await B2CAuthService.instance.getAccessToken();
+        if (token != null) headers['Authorization'] = 'Bearer $token';
+      } catch (_) {
+        // ignore token errors; the endpoint may allow unauthenticated requests
+      }
+    }
 
     debugPrint(
       'SearchService: POST $uri q="$query" mode=$mode limit=$limit (timeout=${timeout ?? const Duration(seconds: 12)})',

@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException
 from datetime import datetime
 
 from app.schemas import ProfileCreate, ProfileUpdate, ProfileResponse
-from app.firebase_db import get_firebase_service
+from app.cosmos_db import get_cosmos_service
 from app.embeddings import get_embedding_service
 from app.azure_search import get_azure_search_service
 from app.cache import get_cache_service
@@ -17,28 +17,23 @@ router = APIRouter(prefix="/profiles", tags=["profiles"])
 @router.post("/upsert", response_model=ProfileResponse)
 def upsert_profile(profile_data: ProfileCreate):
     """
-    Create or update a profile in both Firestore and Qdrant.
-    
-    This endpoint:
-    1. Stores/updates the profile in Firestore
-    2. Generates embeddings for can_offer and wants_learn
-    3. Upserts vectors to Qdrant with profile metadata
-    
-    The profile uses Firebase Auth UID as the unique identifier,
-    combining authentication fields (uid, email, displayName, photoUrl)
-    with skill-swap fields (can_offer, wants_learn, etc.)
+    Create or update a profile in Cosmos DB and Azure AI Search.
+
+    1. Stores/updates the profile in Cosmos DB
+    2. Generates embeddings for skills_to_offer and services_needed
+    3. Upserts vectors to Azure AI Search
     """
     # Get services
-    firebase_service = get_firebase_service()
+    cosmos_service = get_cosmos_service()
     embedding_service = get_embedding_service()
     search_service = get_azure_search_service()
     email_service = get_email_service()
 
     # Check if this is a new profile (for welcome email)
-    existing_profile = firebase_service.get_profile(profile_data.uid)
+    existing_profile = cosmos_service.get_profile(profile_data.uid)
     is_new_profile = existing_profile is None
 
-    # Prepare profile data for Firestore
+    # Prepare profile data for Cosmos DB
     profile_dict = {
         "email": profile_data.email,
         "display_name": profile_data.display_name,
@@ -55,8 +50,8 @@ def upsert_profile(profile_data: ProfileCreate):
         "show_city": profile_data.show_city if profile_data.show_city is not None else True,
     }
     
-    # Upsert to Firestore
-    saved_profile = firebase_service.upsert_profile(profile_data.uid, profile_dict)
+    # Upsert to Cosmos DB
+    saved_profile = cosmos_service.upsert_profile(profile_data.uid, profile_dict)
     
     # Generate embeddings (only if skills are provided)
     if profile_data.skills_to_offer and profile_data.services_needed:
@@ -108,70 +103,45 @@ def upsert_profile(profile_data: ProfileCreate):
 
 @router.get("/{uid}", response_model=ProfileResponse)
 def get_profile(uid: str):
-    """
-    Get a profile by Firebase Auth UID.
-    
-    Args:
-        uid: Firebase Auth user ID
-        
-    Returns:
-        User profile with all fields
-    """
-    firebase_service = get_firebase_service()
-    profile = firebase_service.get_profile(uid)
-    
+    """Get a profile by UID."""
+    cosmos_service = get_cosmos_service()
+    profile = cosmos_service.get_profile(uid)
+
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
-    
+
     return ProfileResponse(**profile)
 
 
 @router.get("/email/{email}", response_model=ProfileResponse)
 def get_profile_by_email(email: str):
-    """
-    Get a profile by email address.
-    
-    Args:
-        email: User email
-        
-    Returns:
-        User profile
-    """
-    firebase_service = get_firebase_service()
-    profile = firebase_service.get_profile_by_email(email)
-    
+    """Get a profile by email address."""
+    cosmos_service = get_cosmos_service()
+    profile = cosmos_service.get_profile_by_email(email)
+
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
-    
+
     return ProfileResponse(**profile)
 
 
 @router.patch("/{uid}", response_model=ProfileResponse)
 def update_profile(uid: str, profile_update: ProfileUpdate):
-    """
-    Partially update a profile.
-    
-    Args:
-        uid: Firebase Auth user ID
-        profile_update: Fields to update (only provided fields will be updated)
-        
-    Returns:
-        Updated profile
-    """
-    firebase_service = get_firebase_service()
+    """Partially update a profile."""
+    cosmos_service = get_cosmos_service()
     embedding_service = get_embedding_service()
     search_service = get_azure_search_service()
 
     # Check if profile exists
-    existing_profile = firebase_service.get_profile(uid)
+    existing_profile = cosmos_service.get_profile(uid)
     if not existing_profile:
         raise HTTPException(status_code=404, detail="Profile not found")
-    
+
     # Prepare update data (only include provided fields)
     update_dict = profile_update.model_dump(exclude_unset=True)
-    
-    # Update Firestore
-    updated_profile = firebase_service.update_profile(uid, update_dict)
+
+    # Update Cosmos DB
+    updated_profile = cosmos_service.update_profile(uid, update_dict)
     
     # If skills changed, update Qdrant embeddings
     if 'skills_to_offer' in update_dict or 'services_needed' in update_dict:
@@ -213,28 +183,16 @@ def update_profile(uid: str, profile_update: ProfileUpdate):
 
 @router.delete("/{uid}")
 def delete_profile(uid: str):
-    """
-    Delete a profile from both Firestore and Qdrant.
-    
-    Args:
-        uid: Firebase Auth user ID
-        
-    Returns:
-        Success message
-    """
-    firebase_service = get_firebase_service()
+    """Delete a profile from Cosmos DB and Azure AI Search."""
+    cosmos_service = get_cosmos_service()
     search_service = get_azure_search_service()
 
-    # Check if profile exists
-    existing_profile = firebase_service.get_profile(uid)
+    existing_profile = cosmos_service.get_profile(uid)
     if not existing_profile:
         raise HTTPException(status_code=404, detail="Profile not found")
 
-    # Delete from Firestore
-    firebase_service.delete_profile(uid)
-
-    # Delete from Azure AI Search
+    cosmos_service.delete_profile(uid)
     search_service.delete_profile(uid)
-    
+
     return {"message": "Profile deleted successfully", "uid": uid}
 
