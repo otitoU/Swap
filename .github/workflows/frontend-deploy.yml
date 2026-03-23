@@ -4,18 +4,19 @@ on:
   push:
     branches: [main]
     paths:
-      - 'swap_frontend/**'
-      - '.github/workflows/frontend-deploy.yml'
+      - "swap_frontend/**"
+      - ".github/workflows/frontend-deploy.yml"
   pull_request:
     branches: [main]
     paths:
-      - 'swap_frontend/**'
+      - "swap_frontend/**"
 
 env:
-  FLUTTER_VERSION: '3.24.0'
-  API_BASE_URL: 'https://app-swapai-backend.azurewebsites.net'
-  ENTRA_TENANT_NAME: 'swapauth'
-  ENTRA_REDIRECT_URI: 'https://stwa-swap-dev.azurestaticapps.net/'
+  FLUTTER_VERSION: "3.24.0"
+  API_BASE_URL: "https://app-swapai-backend.azurewebsites.net"
+  ENTRA_TENANT_NAME: "swapauth"
+  ENTRA_REDIRECT_URI: "https://stwa-swap-dev.azurestaticapps.net/"
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 permissions:
   id-token: write
@@ -70,7 +71,7 @@ jobs:
     environment: production
 
     steps:
-      - uses: actions/checkout@v4  # Required by the SWA action
+      - uses: actions/checkout@v4 # Required by the SWA action
 
       - name: Download build artifact
         uses: actions/download-artifact@v4
@@ -83,10 +84,10 @@ jobs:
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          action: 'upload'
-          app_location: 'swap_frontend/build/web'
-          skip_app_build: true  # Already built above
-          output_location: ''
+          action: "upload"
+          app_location: "swap_frontend/build/web"
+          skip_app_build: true # Already built above
+          output_location: ""
 
       - name: Smoke test
         run: |
